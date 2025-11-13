@@ -1,0 +1,245 @@
+# Implementation Plan
+
+- [x] 1. Set up project structure and Composer configuration
+  - Create directory structure: src/, tests/, docs/, examples/
+  - Create composer.json with PSR-4 autoloading for CodeRex\Telemetry namespace
+  - Configure autoload for helpers.php file
+  - Add PHPUnit and Mockery as dev dependencies
+  - Create README.md with package overview
+  - _Requirements: 1.1, 1.2, 1.3, 1.4, 1.5, 9.1, 9.6_
+
+- [x] 2. Implement Utils helper class
+  - Create src/Helpers/Utils.php with namespace CodeRex\Telemetry\Helpers
+  - Implement getPhpVersion() to return PHP_VERSION
+  - Implement getWordPressVersion() to return global $wp_version
+  - Implement getMySqlVersion() using wpdb->db_version()
+  - Implement getServerSoftware() to return $_SERVER['SERVER_SOFTWARE']
+  - Implement getSiteUrl() to return get_site_url()
+  - Implement getCurrentTimestamp() to return ISO 8601 formatted date
+  - Implement sanitizeEventName() to allow only alphanumeric and underscores
+  - Implement sanitizeProperties() to sanitize array values recursively
+  - Implement getPluginVersion() to extract version from plugin file headers
+  - _Requirements: 3.3, 3.4, 3.5, 3.6, 3.7, 5.2, 5.3, 5.4, 5.5, 5.6, 8.6_
+
+- [x] 3. Implement DriverInterface and OpenPanelDriver
+  - Create src/Drivers/DriverInterface.php with send(), setApiKey(), and getLastError() methods
+  - Create src/Drivers/OpenPanelDriver.php implementing DriverInterface
+  - Define API_ENDPOINT constant for OpenPanel API URL
+  - Implement setApiKey() to store API key in private property
+  - Implement send() method using wp_remote_post() for HTTPS requests
+  - Implement buildHeaders() to construct Authorization and Content-Type headers
+  - Implement makeRequest() to execute wp_remote_post() with 5-second timeout
+  - Implement handleResponse() to check for WP_Error and HTTP status codes
+  - Store error messages in lastError property for debugging
+  - Format payload according to OpenPanel API specification with event and properties keys
+  - _Requirements: 7.1, 7.2, 7.3, 7.4, 7.5, 7.6, 8.2, 8.7_
+
+- [x] 4. Implement ConsentManager class
+  - Create src/ConsentManager.php with namespace CodeRex\Telemetry
+  - Define OPTION_KEY constant as 'coderex_telemetry_opt_in'
+  - Define NOTICE_DISMISSED_KEY constant as 'coderex_telemetry_notice_dismissed'
+  - Implement hasConsent() to check if option value is 'yes'
+  - Implement grantConsent() to set option to 'yes' with autoload false
+  - Implement revokeConsent() to set option to 'no' with autoload false
+  - Implement shouldShowNotice() to check if consent not set and notice not dismissed
+  - Implement displayAdminNotice() to render HTML notice with Allow and No thanks buttons
+  - Implement handleConsentAction() to process AJAX requests with nonce verification
+  - Implement dismissNotice() to set dismissed flag in options
+  - Add JavaScript for AJAX consent submission in admin notice
+  - _Requirements: 2.1, 2.2, 2.3, 2.4, 2.5, 2.6_
+
+- [x] 5. Implement EventDispatcher class
+  - Create src/EventDispatcher.php with namespace CodeRex\Telemetry
+  - Add constructor accepting DriverInterface, plugin name, and plugin version
+  - Implement dispatch() method to orchestrate event sending
+  - Implement normalizePayload() to create consistent event structure with event and properties keys
+  - Implement addSystemInfo() to add PHP, WordPress, MySQL versions and server software using Utils class
+  - Implement validatePayload() to check required fields: event, site_url, plugin_name, plugin_version, timestamp
+  - Add site_url, plugin_name, plugin_version, and timestamp to all events
+  - Return false if validation fails or driver send fails
+  - Log errors using error_log() for debugging
+  - _Requirements: 3.2, 3.3, 3.4, 3.5, 3.6, 3.7, 3.8, 5.2, 5.3, 5.4, 5.5, 5.6, 5.7_
+
+- [x] 6. Implement DeactivationHandler class
+  - Create src/DeactivationHandler.php with namespace CodeRex\Telemetry
+  - Add constructor accepting plugin file, plugin name, plugin version, ConsentManager, and EventDispatcher
+  - Implement register() to hook into WordPress deactivation action for the plugin
+  - Implement handleDeactivation() to check consent before showing modal
+  - Implement enqueueModalAssets() to load CSS and JavaScript for deactivation modal
+  - Implement renderModal() to output HTML with reason radio buttons and textarea
+  - Add reason categories: temporary, missing_features, better_alternative, not_working, other
+  - Implement handleReasonSubmission() to process AJAX form submission with nonce verification
+  - Send deactivation event with reason_category and reason_text to EventDispatcher
+  - Add JavaScript to intercept deactivation link and show modal
+  - _Requirements: 4.1, 4.2, 4.3, 4.4, 4.5, 4.6, 4.7, 4.8, 4.9_
+
+- [x] 7. Implement Client class
+  - Create src/Client.php with namespace CodeRex\Telemetry
+  - Add constructor accepting API key, plugin name, and plugin file path
+  - Validate API key is not empty, throw InvalidArgumentException if missing
+  - Extract plugin version from plugin file using Utils::getPluginVersion()
+  - Initialize ConsentManager instance
+  - Initialize OpenPanelDriver with API key
+  - Initialize EventDispatcher with driver, plugin name, and version
+  - Initialize DeactivationHandler with required dependencies
+  - Implement init() method to call setupHooks() and scheduleBackgroundReporting()
+  - Implement track() method to check consent and dispatch event if granted
+  - Implement setupHooks() to register admin_notices action for consent notice
+  - Implement scheduleBackgroundReporting() to create WP-Cron job for weekly system info
+  - Add action hook for 'coderex_telemetry_weekly_report' cron event
+  - Apply filter 'coderex_telemetry_report_interval' for customizable interval (default: weekly)
+  - Send install event when user grants consent for the first time
+  - _Requirements: 1.1, 1.5, 2.1, 2.5, 2.6, 3.1, 3.2, 5.1, 5.2, 5.8, 6.1, 6.2, 6.3, 6.6, 7.2_
+
+- [x] 8. Implement global helper functions
+  - Create src/helpers.php file (loaded via composer.json files autoload)
+  - Implement coderex_telemetry() function to return singleton Client instance
+  - Implement coderex_telemetry_track() function accepting event name and properties array
+  - Use global variable to store Client instance for singleton pattern
+  - Call track() method on Client instance from helper function
+  - _Requirements: 6.4, 6.5_
+
+- [x] 9. Create install event functionality
+  - Modify ConsentManager::grantConsent() to trigger install event
+  - Create install event payload with event name 'telemetry_installed'
+  - Include install_time in properties using Utils::getCurrentTimestamp()
+  - Dispatch install event through EventDispatcher
+  - Ensure install event only sent once when consent is first granted
+  - _Requirements: 3.1, 3.2, 3.3, 3.4, 3.5, 3.6, 3.7, 3.8_
+
+- [x] 10. Create weekly system info reporting
+  - Add callback function for 'coderex_telemetry_weekly_report' cron action in Client
+  - Check consent before sending system info event
+  - Create system info event payload with event name 'system_info'
+  - Include all system information using Utils methods
+  - Dispatch system info event through EventDispatcher
+  - Ensure cron job is scheduled on Client initialization
+  - Unschedule cron job if consent is revoked
+  - _Requirements: 5.1, 5.2, 5.3, 5.4, 5.5, 5.6, 5.7, 5.8_
+
+- [x] 11. Add security measures
+  - Add nonce verification to all AJAX handlers in ConsentManager and DeactivationHandler
+  - Use wp_verify_nonce() with unique action names
+  - Add capability checks using current_user_can('manage_options') for admin actions
+  - Sanitize all user input using sanitize_text_field() and sanitize_textarea_field()
+  - Escape all output in admin notices and modals using esc_html(), esc_attr(), esc_url()
+  - Validate URLs using esc_url_raw() before sending to API
+  - Ensure API key never exposed in frontend JavaScript or HTML
+  - Set wp_remote_post() timeout to 5 seconds to prevent hanging
+  - _Requirements: 8.1, 8.2, 8.3, 8.4, 8.5, 8.6, 8.7_
+
+- [x] 12. Create documentation files
+  - Create docs/integration.md with step-by-step integration guide for plugin developers
+  - Include code examples for basic setup with API key and plugin name
+  - Document how to call track() method for custom events
+  - Document available filters: coderex_telemetry_report_interval, coderex_telemetry_system_info
+  - Create docs/event-catalog.md listing all default events with payload structures
+  - Document install event, deactivation event, and system info event formats
+  - Provide examples of custom event tracking
+  - Create docs/privacy.md explaining data collection practices
+  - List all data points collected and their purposes
+  - Explain consent requirement and user rights
+  - Update README.md with installation instructions and quick start example
+  - _Requirements: 9.1, 9.2, 9.3, 9.4, 9.5_
+
+- [x] 13. Create example integration
+  - Create examples/creator-lms-integration.php file
+  - Show complete plugin integration example with require vendor/autoload.php
+  - Demonstrate Client instantiation with API key, plugin name, and __FILE__
+  - Show init() method call
+  - Demonstrate custom event tracking with track() method
+  - Show filter usage for customizing report interval
+  - Add comments explaining each step
+  - _Requirements: 9.5_
+
+- [ ]* 14. Write unit tests
+  - [ ]* 14.1 Create tests/UtilsTest.php
+    - Test getPhpVersion() returns valid version string
+    - Test getWordPressVersion() returns valid version string
+    - Test getMySqlVersion() returns valid version string
+    - Test getServerSoftware() returns string
+    - Test getSiteUrl() returns valid URL
+    - Test getCurrentTimestamp() returns ISO 8601 format
+    - Test sanitizeEventName() removes invalid characters
+    - Test sanitizeProperties() sanitizes array values
+    - _Requirements: 3.3, 3.4, 3.5, 3.6, 3.7, 5.2, 5.3, 5.4, 5.5, 5.6_
+
+  - [ ]* 14.2 Create tests/OpenPanelDriverTest.php
+    - Mock wp_remote_post() function
+    - Test send() with successful response returns true
+    - Test send() with failed response returns false
+    - Test send() with WP_Error returns false and stores error
+    - Test buildHeaders() includes Authorization and Content-Type
+    - Test payload format matches OpenPanel API specification
+    - _Requirements: 7.1, 7.2, 7.3, 7.4_
+
+  - [ ]* 14.3 Create tests/ConsentManagerTest.php
+    - Mock get_option() and update_option() functions
+    - Test hasConsent() returns true when option is 'yes'
+    - Test hasConsent() returns false when option is 'no' or not set
+    - Test grantConsent() sets option to 'yes'
+    - Test revokeConsent() sets option to 'no'
+    - Test shouldShowNotice() logic with different option states
+    - _Requirements: 2.3, 2.4, 2.5, 2.6_
+
+  - [ ]* 14.4 Create tests/EventDispatcherTest.php
+    - Mock DriverInterface
+    - Test dispatch() calls driver send() method
+    - Test normalizePayload() creates correct structure
+    - Test addSystemInfo() adds all required fields
+    - Test validatePayload() rejects payloads missing required fields
+    - Test validatePayload() accepts valid payloads
+    - _Requirements: 3.2, 3.3, 3.4, 3.5, 3.6, 3.7, 3.8_
+
+  - [ ]* 14.5 Create tests/ClientTest.php
+    - Test constructor throws exception when API key is empty
+    - Test track() returns false when consent not granted
+    - Test track() calls EventDispatcher when consent granted
+    - Test init() registers WordPress hooks
+    - Test scheduleBackgroundReporting() creates cron job
+    - _Requirements: 1.1, 2.5, 2.6, 5.1, 6.1, 6.2, 6.3_
+
+- [ ]* 15. Add PHPUnit configuration
+  - Create phpunit.xml with test suite configuration
+  - Configure bootstrap file for WordPress test environment
+  - Set up test directories and file patterns
+  - Configure code coverage reporting
+  - _Requirements: 1.4_
+
+- [x] 16. Add CSS styling for admin UI
+  - Create inline CSS for consent admin notice with proper spacing and button styling
+  - Style Allow button as primary WordPress button
+  - Style No thanks button as secondary WordPress button
+  - Create CSS for deactivation modal overlay with semi-transparent background
+  - Style modal content box with centered positioning and white background
+  - Style radio buttons and textarea in deactivation form
+  - Add responsive styles for mobile devices
+  - Ensure styles match WordPress admin design patterns
+  - _Requirements: 2.1, 4.1_
+
+- [x] 17. Add JavaScript for admin interactions
+  - Create inline JavaScript for consent notice AJAX handling
+  - Add click handlers for Allow and No thanks buttons
+  - Send AJAX request to admin-ajax.php with action and nonce
+  - Hide notice after successful consent action
+  - Create JavaScript for deactivation modal
+  - Intercept plugin deactivation link click
+  - Show modal instead of immediate deactivation
+  - Handle form submission via AJAX with reason data
+  - Allow skip option to deactivate without providing reason
+  - Proceed with actual deactivation after modal submission or skip
+  - _Requirements: 2.1, 2.2, 2.3, 2.4, 4.1, 4.2, 4.3_
+
+- [x] 18. Final integration and testing
+  - Create a test WordPress plugin in examples/ directory
+  - Install SDK via Composer in test plugin
+  - Test complete activation flow with consent notice
+  - Verify install event sent to OpenPanel when consent granted
+  - Test custom event tracking with track() method
+  - Manually trigger weekly cron and verify system info event
+  - Test deactivation flow with reason modal
+  - Verify deactivation event sent with reason data
+  - Test consent denial flow and verify no events sent
+  - Test with different PHP versions (7.4, 8.0, 8.1, 8.2)
+  - Verify all security measures (nonces, sanitization, escaping)
+  - _Requirements: 1.1, 2.1, 2.2, 2.3, 2.4, 2.5, 2.6, 3.1, 4.1, 4.2, 4.3, 5.1, 6.1, 6.2, 6.3, 7.1, 8.1, 8.2, 8.3, 8.4, 8.5_

@@ -1,0 +1,129 @@
+# CodeRex Telemetry SDK
+
+Privacy-first telemetry SDK for Code Rex WordPress plugins.
+
+## Overview
+
+The CodeRex Telemetry SDK is a Composer package that provides privacy-first telemetry tracking for WordPress plugins. It enforces user consent, standardizes event payloads, and integrates directly with OpenPanel analytics platform.
+
+## Features
+
+- **Privacy-First**: No data is sent without explicit user consent
+- **Easy Integration**: Simple API with just a few lines of code
+- **Automatic Events**: Tracks install, deactivation, and weekly system info
+- **Custom Events**: Track plugin-specific events with custom properties
+- **WordPress Native**: Uses WordPress APIs and follows WordPress coding standards
+- **Secure**: HTTPS-only transmission, nonce verification, input sanitization
+
+## Requirements
+
+- PHP 7.4 or higher
+- WordPress 5.0 or higher
+- PHP cURL extension (for API communication)
+
+## Installation
+
+### Step 1: Install via Composer
+
+In your WordPress plugin directory, run:
+
+```bash
+composer require coderexltd/telemetry
+```
+
+### Step 2: Require Autoloader
+
+In your main plugin file, require the Composer autoloader:
+
+```php
+require_once __DIR__ . '/vendor/autoload.php';
+```
+
+That's it! You're ready to use the SDK.
+
+## Quick Start
+
+Here's a complete example of integrating the SDK into your WordPress plugin:
+
+```php
+<?php
+/**
+ * Plugin Name: My Awesome Plugin
+ * Description: An awesome WordPress plugin with telemetry
+ * Version: 1.0.0
+ * Author: Your Name
+ */
+
+// Prevent direct access
+if (!defined('ABSPATH')) {
+    exit;
+}
+
+// Require Composer autoloader
+require_once __DIR__ . '/vendor/autoload.php';
+
+use CodeRex\Telemetry\Client;
+
+// Initialize the telemetry client
+$telemetry = new Client(
+    'your-openpanel-api-key-here',  // Your OpenPanel API key
+    'My Awesome Plugin',             // Your plugin name
+    __FILE__                         // Plugin file path
+);
+
+// Initialize hooks and background tasks
+$telemetry->init();
+
+// Store globally for later use
+global $my_plugin_telemetry;
+$my_plugin_telemetry = $telemetry;
+
+// Track custom events anywhere in your plugin
+add_action('my_plugin_feature_activated', function() {
+    global $my_plugin_telemetry;
+    $my_plugin_telemetry->track('feature_activated', [
+        'feature_name' => 'advanced_analytics'
+    ]);
+});
+
+// Or use the helper function
+add_action('my_plugin_course_created', function($course_id) {
+    coderex_telemetry_track('course_created', [
+        'course_id' => $course_id,
+        'course_type' => 'video'
+    ]);
+});
+```
+
+### What Happens Next?
+
+1. **User Activation**: When a user activates your plugin, they'll see a consent notice
+2. **User Choice**: They can click "Allow" to opt in or "No thanks" to opt out
+3. **Automatic Tracking**: If they opt in, the SDK automatically sends:
+   - Install event (one time)
+4. **Custom Events**: Your custom `track()` calls will also be sent (only if opted in)
+
+## What Data is Collected?
+
+The SDK collects only technical information with user consent:
+
+- Site URL
+- Plugin name and version
+- PHP version
+- WordPress version
+- MySQL version
+- Server software
+- Event timestamps
+
+**No personal data** (emails, usernames) is collected by default. Each site is automatically assigned a unique profile ID for analytics.
+
+## Documentation
+- [Event Catalog](docs/event-catalog.md) - List of all events and their payloads
+
+## License
+
+GPL-2.0-or-later
+
+## Support
+
+For support, please contact support@coderex.co

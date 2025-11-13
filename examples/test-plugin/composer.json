@@ -1,0 +1,19 @@
+{
+    "name": "coderexltd/telemetry-test-plugin",
+    "description": "Test plugin for CodeRex Telemetry SDK",
+    "type": "wordpress-plugin",
+    "license": "GPL-2.0-or-later",
+    "require": {
+        "php": ">=7.4",
+        "coderexltd/telemetry": "*"
+    },
+    "repositories": [
+        {
+            "type": "path",
+            "url": "../../",
+            "options": {
+                "symlink": true
+            }
+        }
+    ]
+}
