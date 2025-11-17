@@ -6,6 +6,14 @@ Privacy-first telemetry SDK for Code Rex WordPress plugins.
 
 The CodeRex Telemetry SDK is a Composer package that provides privacy-first telemetry tracking for WordPress plugins. It enforces user consent, standardizes event payloads, and integrates directly with OpenPanel analytics platform.
 
+## Compliance and Development Guidelines (MUST READ)
+
+The SDK's core purpose is to handle data transmission securely and ethically. Developers using this SDK **must** adhere to strict consent and disclosure requirements.
+
+* **Internal Compliance Mandates:** For a complete list of requirements regarding PII collection, opt-in placement, and WordPress.org submission rules, please see our detailed **[Privacy Implementation Guideline](PRIVACY_GUIDELINE.md)**.
+  *(This document details mandatory steps for GDPR/WP.org compliance when implementing the SDK.)*
+
+
 ## Features
 
 - **Privacy-First**: No data is sent without explicit user consent
