@@ -23,7 +23,7 @@ Collecting the administrator's email address is considered collecting PII for a 
 - State clearly that tracking is OFF by default and requires explicit opt-in.
 
 ### B. WordPress Privacy Policy Integration
-You must use the WordPress Privacy Policy API (```wp_add_privacy_policy_content()```) to automatically generate disclosure text for the site owner's required Privacy Policy page. This text should detail:
+Need to inclue message in wp dashboard. This text should detail:
 - What data is collected.
 - The purpose of data collection.
 - The ability for the site administrator to opt out at any time.
