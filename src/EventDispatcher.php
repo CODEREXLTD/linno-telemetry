@@ -49,11 +49,10 @@ class EventDispatcher {
 	 * @param DriverInterface $driver Driver instance for sending events.
 	 * @param string          $plugin_name Plugin name.
 	 * @param string          $plugin_version Plugin version.
-	 * @param string          $plugin_slug Plugin slug.
 	 *
 	 * @since 1.0.0
 	 */
-	public function __construct( DriverInterface $driver, string $plugin_name, string $plugin_version, string $plugin_slug = '' ) {
+	public function __construct( DriverInterface $driver, string $plugin_name, string $plugin_version ) {
 		$this->driver         = $driver;
 		$this->plugin_name    = $plugin_name;
 		$this->plugin_version = $plugin_version;
