@@ -114,7 +114,7 @@ class Client {
         $driver->setApiSecret( $apiSecret );
 
         // Initialize EventDispatcher
-        $this->dispatcher = new EventDispatcher( $driver, $pluginName, $this->pluginVersion, $this->slug );
+        $this->dispatcher = new EventDispatcher( $driver, $pluginName, $this->pluginVersion );
 
         // Store instance in global variable with plugin-specific name
         $this->storeGlobalInstance();

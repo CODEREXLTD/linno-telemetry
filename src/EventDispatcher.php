@@ -44,13 +44,6 @@ class EventDispatcher {
 	private $plugin_version;
 
 	/**
-	 * Plugin slug
-	 *
-	 * @var string
-	 */
-	private $plugin_slug;
-
-	/**
 	 * Constructor
 	 *
 	 * @param DriverInterface $driver Driver instance for sending events.
@@ -64,7 +57,6 @@ class EventDispatcher {
 		$this->driver         = $driver;
 		$this->plugin_name    = $plugin_name;
 		$this->plugin_version = $plugin_version;
-		$this->plugin_slug    = $plugin_slug;
 	}
 
 	/**
