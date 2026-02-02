@@ -81,13 +81,6 @@ class Client {
      */
     private EventDispatcher $dispatcher;
 
-    /**
-     * Whether lifecycle tracking is initialized
-     *
-     * @var bool
-     * @since 1.0.0
-     */
-    private bool $lifecycleTrackingInitialized = false;
 
     /**
      * Constructor

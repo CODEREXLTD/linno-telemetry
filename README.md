@@ -118,9 +118,6 @@ The SDK automatically tracks these events **without requiring opt-in**:
 - **`plugin_activated`**: When the plugin is activated
   - Includes: `site_url`, `activation_time`
   
-- **`plugin_deactivated`**: When the plugin is deactivated
-  - Includes: `usage_duration`, `last_core_action`, `deactivation_time`
-
 **Why no opt-in required?** Lifecycle events are essential for understanding plugin adoption and uninstallation reasons. They contain no personal data.
 
 For detailed information, see [Lifecycle Events Documentation](LIFECYCLE_EVENTS.md).
