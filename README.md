@@ -18,7 +18,7 @@ The SDK's core purpose is to handle data transmission securely and ethically. De
 
 - **Privacy-First**: No data is sent without explicit user consent (except lifecycle events)
 - **Easy Integration**: Simple API with just a few lines of code
-- **Automatic Lifecycle Events**: Automatically tracks plugin activation and deactivation
+- **Automatic Lifecycle Events**: Automatically tracks plugin activation
 - **Custom Events**: Track plugin-specific events with custom properties
 - **Usage Metrics**: Automatic calculation of usage duration and last action tracking
 - **WordPress Native**: Uses WordPress APIs and follows WordPress coding standards
@@ -106,7 +106,7 @@ add_action('my_plugin_course_created', function($course_id) {
 
 ### What Happens Next?
 
-1. **Automatic Lifecycle Tracking**: The SDK immediately starts tracking activation/deactivation
+1. **Automatic Lifecycle Tracking**: The SDK immediately starts tracking activation
 2. **User Consent Notice**: When a user activates your plugin, they'll see a consent notice from Appsero
 3. **User Choice**: They can click "Allow" to opt in or "No thanks" to opt out
 4. **Custom Events**: Your custom `coderex_telemetry_track()` calls will be sent only if opted in
