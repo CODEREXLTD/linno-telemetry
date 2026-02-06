@@ -81,6 +81,7 @@ class Client {
      */
     private EventDispatcher $dispatcher;
 
+
     /**
      * Constructor
      *
@@ -264,5 +265,19 @@ class Client {
         $safe_slug = str_replace( '-', '_', $slug );
         $global_name = $safe_slug . '_telemetry_client';
         return $GLOBALS[ $global_name ] ?? null;
+    }
+
+    /**
+     * Update last core action
+     *
+     * Updates the last core action performed by the user.
+     * This is used to track what the user was doing before deactivation.
+     *
+     * @param string $action The core action name
+     * @return void
+     * @since 1.0.0
+     */
+    public function updateLastCoreAction( string $action ): void {
+        update_option( $this->slug . '_last_core_action', $action, false );
     }
 }

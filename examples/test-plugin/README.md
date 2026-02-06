@@ -77,7 +77,6 @@ The plugin adds a "Telemetry Test" menu item in WordPress admin with:
 
 - **Consent Status Display**: Shows current opt-in/opt-out status
 - **Custom Event Testing**: Form to send test events with custom properties
-- **Manual Cron Trigger**: Button to manually trigger weekly system info report
 - **System Information**: Display of all collected system data
 - **Testing Checklist**: Complete list of test scenarios
 - **Debug Information**: SDK initialization status and diagnostics
