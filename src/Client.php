@@ -81,6 +81,46 @@ class Client {
      */
     private EventDispatcher $dispatcher;
 
+    /**
+     * Consent instance
+     *
+     * @var Consent
+     * @since 1.0.0
+     */
+    private Consent $consent;
+
+    /**
+     * Deactivation instance
+     *
+     * @var Deactivation
+     * @since 1.0.0
+     */
+    private Deactivation $deactivation;
+
+    /**
+     * Queue instance
+     *
+     * @var Queue
+     * @since 1.0.0
+     */
+    private Queue $queue;
+
+    /**
+     * TriggerManager instance
+     *
+     * @var TriggerManager
+     * @since 1.0.0
+     */
+    private ?TriggerManager $trigger_manager = null;
+
+    /**
+     * Text domain for i18n
+     *
+     * @var string
+     * @since 1.0.0
+     */
+    private string $textDomain;
+
 
     /**
      * Constructor
@@ -89,13 +129,15 @@ class Client {
      * Validates the API key and extracts plugin version from the plugin file.
      *
      * @param string $apiKey API key for OpenPanel authentication.
+     * @param string $apiSecret API secret for OpenPanel authentication.
      * @param string $pluginName Human-readable plugin name.
      * @param string $pluginFile Path to the main plugin file.
+     * @param string $textDomain Text domain for internationalization.
      *
      * @throws InvalidArgumentException If API key is empty.
      * @since 1.0.0
      */
-    public function __construct( string $apiKey, string $apiSecret, string $pluginName, string $pluginFile ) {
+    public function __construct( string $apiKey, string $apiSecret, string $pluginName, string $pluginFile, string $textDomain ) {
         // Validate API key
         if ( empty( $apiKey ) ) {
             throw new InvalidArgumentException( 'API key cannot be empty' );
@@ -106,6 +148,7 @@ class Client {
         $this->pluginName   = $pluginName;
         $this->pluginFile   = $pluginFile;
         $this->pluginVersion= Utils::getPluginVersion( $pluginFile );
+        $this->textDomain   = $textDomain;
         $this->set_slug();
 
         // Initialize OpenPanelDriver with API key
@@ -116,66 +159,283 @@ class Client {
         // Initialize EventDispatcher
         $this->dispatcher = new EventDispatcher( $driver, $pluginName, $this->pluginVersion );
 
-        // Store instance in global variable with plugin-specific name
-        $this->storeGlobalInstance();
+        // Initialize handlers
+        $this->consent = new Consent( $this );
+        $this->deactivation = new Deactivation( $this );
+        $this->queue = new Queue();
+
+        // Schedule background reporting
+        $this->scheduleBackgroundReporting();
+    }
+
+    /**
+     * Get the text domain.
+     *
+     * @return string
+     */
+    public function get_text_domain(): string {
+        return $this->textDomain;
+    }
+
+    /**
+     * Initialize the telemetry client
+     *
+     * This method should be called by the plugin developer to initialize the hooks.
+     *
+     * @return void
+     */
+    public function init(): void {
+        load_plugin_textdomain( $this->textDomain, false, dirname( plugin_basename( $this->pluginFile ) ) . '/languages' );
+        $this->consent->init();
+        $this->deactivation->init();
+        $this->init_triggers();
+        
+        register_activation_hook( $this->pluginFile, [ $this, 'activate' ] );
+    }
+
+    /**
+     * Plugin activation hook.
+     *
+     * @return void
+     */
+    public function activate(): void {
+        $this->queue->create_table();
+        $this->track( 'plugin_activated', [], true );
     }
 
 
     /**
      * Track a custom event
      *
-     * Sends a custom event to OpenPanel if opt-in is enabled.
+     * Adds a custom event to the queue if opt-in is enabled.
      *
      * @param string $event Event name.
      * @param array  $properties Event properties (optional).
+     * @param bool   $override Whether to override the opt-in check.
      *
-     * @return bool True on success, false on failure or opt-in not enabled.
+     * @return void
      * @since 1.0.0
      */
-    public function track( string $event, array $properties = array() ): bool {
+    public function track( string $event, array $properties = array(), bool $override = false ): void {
         // Check if opt-in is enabled
-        if ( ! $this->isOptInEnabled() ) {
-            return false;
+        if ( ! $override && ! $this->isOptInEnabled() ) {
+            return;
         }
 
-        // Dispatch event
-        return $this->dispatcher->dispatch( $event, $properties );
+        // Add event to queue
+        $this->queue->add( $event, $properties );
     }
 
     /**
      * Check if opt-in is enabled
      *
      * Checks if the user has opted in to telemetry tracking.
-     * You can set this via: update_option('coderex_telemetry_opt_in', 'yes');
      *
      * @return bool True if opt-in is enabled, false otherwise.
      * @since 1.0.0
      */
     private function isOptInEnabled(): bool {
-        $opt_in = get_option( $this->slug.'_allow_tracking', 'no' );
-        return $opt_in === 'yes';
+        // This will be replaced by the Consent class logic
+        return 'yes' === get_option( $this->get_optin_key(), 'no' );
+    }
+
+    /**
+     * Get the option key for tracking consent.
+     *
+     * @return string
+     */
+    public function get_optin_key(): string {
+        return $this->slug . '_allow_tracking';
+    }
+
+    /**
+     * Get the plugin slug.
+     *
+     * @return string
+     */
+    public function get_slug(): string {
+        return $this->slug;
+    }
+
+    /**
+     * Get the plugin file path.
+     *
+     * @return string
+     */
+    public function get_plugin_file(): string {
+        return $this->pluginFile;
+    }
+
+    /**
+     * Get the plugin name.
+     *
+     * @return string
+     */
+    public function get_plugin_name(): string {
+        return $this->pluginName;
+    }
+
+    /**
+     * Track a 'setup' event.
+     *
+     * This event is sent only once after the plugin setup is completed.
+     * Requires user consent.
+     *
+     * @param array $properties Additional properties for the event.
+     * @return void
+     */
+    public function track_setup( array $properties = [] ): void {
+        if ( $this->has_sent_event( 'setup' ) ) {
+            return;
+        }
+
+        $this->track( 'setup', $properties );
+        $this->mark_event_sent( 'setup' );
+    }
+
+    /**
+     * Track a 'first_strike' event.
+     *
+     * This event is sent only once when the user experiences the core value of the product.
+     * Requires user consent.
+     *
+     * @param array $properties Additional properties for the event.
+     * @return void
+     */
+    public function track_first_strike( array $properties = [] ): void {
+        if ( $this->has_sent_event( 'first_strike' ) ) {
+            return;
+        }
+
+        $this->track( 'first_strike', $properties );
+        $this->mark_event_sent( 'first_strike' );
+    }
+
+    /**
+     * Track a 'kui' (Key Usage Indicator) event.
+     *
+     * This event can be sent multiple times when the user gets significant value from the plugin.
+     * Requires user consent.
+     *
+     * @param string $kui_name The name of the KUI event (e.g., 'funnel_order_received').
+     * @param array $properties Additional properties for the event.
+     * @return void
+     */
+    public function track_kui( string $kui_name, array $properties = [] ): void {
+        $this->track( 'kui_' . $kui_name, $properties );
+    }
+
+    /**
+     * Get the TriggerManager instance
+     *
+     * Provides access to configure automatic event triggers.
+     *
+     * @return TriggerManager
+     * @since 1.0.0
+     */
+    public function triggers(): TriggerManager {
+        if ( null === $this->trigger_manager ) {
+            $this->trigger_manager = new TriggerManager( $this );
+        }
+        return $this->trigger_manager;
+    }
+
+    /**
+     * Define automatic triggers for PLG events
+     *
+     * Simplified method to configure all triggers at once.
+     *
+     * @param array $config Configuration array with:
+     *                       - setup: hook name or ['hook' => hook_name, 'callback' => callable]
+     *                       - first_strike: hook name or ['hook' => hook_name, 'callback' => callable]
+     *                       - kui: array of KUI configurations
+     * @return self
+     * @since 1.0.0
+     */
+    public function define_triggers( array $config ): self {
+        $triggers = $this->triggers();
+
+        if ( isset( $config['setup'] ) ) {
+            $hook = is_array( $config['setup'] ) ? $config['setup']['hook'] : $config['setup'];
+            $callback = is_array( $config['setup'] ) ? ( $config['setup']['callback'] ?? null ) : null;
+            $triggers->on_setup( $hook, $callback );
+        }
+
+        if ( isset( $config['first_strike'] ) ) {
+            $hook = is_array( $config['first_strike'] ) ? $config['first_strike']['hook'] : $config['first_strike'];
+            $callback = is_array( $config['first_strike'] ) ? ( $config['first_strike']['callback'] ?? null ) : null;
+            $triggers->on_first_strike( $hook, $callback );
+        }
+
+        if ( isset( $config['kui'] ) && is_array( $config['kui'] ) ) {
+            foreach ( $config['kui'] as $name => $kui_config ) {
+                if ( is_array( $kui_config ) ) {
+                    $triggers->on_kui( $name, $kui_config );
+                }
+            }
+        }
+
+        return $this;
+    }
+
+    /**
+     * Initialize trigger manager
+     *
+     * Must be called after defining triggers and before init completes.
+     *
+     * @return void
+     * @since 1.0.0
+     */
+    private function init_triggers(): void {
+        if ( null !== $this->trigger_manager ) {
+            $this->trigger_manager->init();
+        }
+    }
+
+    /**
+     * Check if a specific event has already been sent.
+     *
+     * @param string $event_name The name of the event to check.
+     * @return bool True if the event has been sent, false otherwise.
+     * @since 1.0.0
+     */
+    public function has_sent_event( string $event_name ): bool {
+        return 'yes' === get_option( $this->slug . '_event_sent_' . $event_name, 'no' );
+    }
+
+    /**
+     * Mark a specific event as sent.
+     *
+     * @param string $event_name The name of the event to mark as sent.
+     * @return void
+     * @since 1.0.0
+     */
+    public function mark_event_sent( string $event_name ): void {
+        update_option( $this->slug . '_event_sent_' . $event_name, 'yes' );
     }
 
     /**
      * Schedule background reporting via WP-Cron
      *
      * Creates a weekly cron job for sending system info events.
-     * Allows customization via the 'coderex_telemetry_report_interval' filter.
+     * Allows customization via a filter.
      *
      * @return void
      * @since 1.0.0
      */
     private function scheduleBackgroundReporting(): void {
+        $hook = $this->get_cron_hook();
+
         // Hook callback for weekly report
-        add_action( 'coderex_telemetry_weekly_report', array( $this, 'sendSystemInfoReport' ) );
+        add_action( $hook, array( $this, 'process_queue' ) );
 
         // Schedule cron job if not already scheduled
-        if ( ! wp_next_scheduled( 'coderex_telemetry_weekly_report' ) ) {
+        if ( ! wp_next_scheduled( $hook ) ) {
             // Apply filter for customizable interval (default: weekly)
-            $interval = apply_filters( 'coderex_telemetry_report_interval', 'weekly' );
+            $interval = apply_filters( $this->slug . '_telemetry_report_interval', 'weekly' );
 
             // Schedule the event
-            wp_schedule_event( time(), $interval, 'coderex_telemetry_weekly_report' );
+            wp_schedule_event( time(), $interval, $hook );
         }
     }
 
@@ -189,28 +449,51 @@ class Client {
      * @since 1.0.0
      */
     private function unscheduleBackgroundReporting(): void {
-        $timestamp = wp_next_scheduled( 'coderex_telemetry_weekly_report' );
+        $hook = $this->get_cron_hook();
+        $timestamp = wp_next_scheduled( $hook );
         if ( $timestamp ) {
-            wp_unschedule_event( $timestamp, 'coderex_telemetry_weekly_report' );
+            wp_unschedule_event( $timestamp, $hook );
         }
     }
 
     /**
-     * Send system info report
+     * Get the cron hook name.
      *
-     * Callback for the weekly cron job. Sends system info event if opt-in is enabled.
+     * @return string
+     */
+    public function get_cron_hook(): string {
+        return $this->slug . '_telemetry_queue_process';
+    }
+
+    /**
+     * Process the event queue
+     *
+     * Callback for the cron job. Sends events from the queue if opt-in is enabled.
      *
      * @return void
      * @since 1.0.0
      */
-    public function sendSystemInfoReport(): void {
-        // Check if opt-in is enabled
-        if ( ! $this->isOptInEnabled() ) {
+    public function process_queue(): void {
+        $events = $this->queue->get_all();
+
+        if ( empty( $events ) ) {
             return;
         }
 
-        // Send system info event
-        $this->dispatcher->dispatch( 'system_info', array() );
+        $ids_to_delete = [];
+
+        foreach ( $events as $event ) {
+            $properties = json_decode( $event->properties, true );
+            $result = $this->dispatcher->dispatch( $event->event, $properties );
+
+            if ( $result ) {
+                $ids_to_delete[] = $event->id;
+            }
+        }
+
+        if ( ! empty( $ids_to_delete ) ) {
+            $this->queue->delete( $ids_to_delete );
+        }
     }
 
 
@@ -219,65 +502,7 @@ class Client {
      *
      * @return void
      */
-    public function set_slug() {
-        $base_name = plugin_basename( $this->pluginFile );
-        $this->slug = dirname( $base_name );
-    }
-
-    /**
-     * Store the client instance in a plugin-specific global variable
-     *
-     * @return void
-     * @since 1.0.0
-     */
-    private function storeGlobalInstance(): void {
-        $global_name = $this->getGlobalVariableName();
-        $GLOBALS[ $global_name ] = $this;
-    }
-
-    /**
-     * Get the plugin-specific global variable name
-     *
-     * Converts plugin slug to a valid variable name.
-     * Example: "best-woocommerce-feed" becomes "best_woocommerce_feed_telemetry_client"
-     *
-     * @return string Global variable name
-     * @since 1.0.0
-     */
-    private function getGlobalVariableName(): string {
-        // Convert slug to valid variable name (replace hyphens with underscores)
-        $safe_slug = str_replace( '-', '_', $this->slug );
-        return $safe_slug . '_telemetry_client';
-    }
-
-    /**
-     * Get the client instance for a specific plugin
-     *
-     * Static method to retrieve the telemetry client for a plugin.
-     *
-     * @param string $plugin_file The main plugin file path
-     * @return Client|null The client instance or null if not found
-     * @since 1.0.0
-     */
-    public static function getInstance( string $plugin_file ): ?Client {
-        $base_name = plugin_basename( $plugin_file );
-        $slug = dirname( $base_name );
-        $safe_slug = str_replace( '-', '_', $slug );
-        $global_name = $safe_slug . '_telemetry_client';
-        return $GLOBALS[ $global_name ] ?? null;
-    }
-
-    /**
-     * Update last core action
-     *
-     * Updates the last core action performed by the user.
-     * This is used to track what the user was doing before deactivation.
-     *
-     * @param string $action The core action name
-     * @return void
-     * @since 1.0.0
-     */
-    public function updateLastCoreAction( string $action ): void {
-        update_option( $this->slug . '_last_core_action', $action, false );
+    private function set_slug() {
+        $this->slug = dirname( plugin_basename( $this->pluginFile ) );
     }
 }

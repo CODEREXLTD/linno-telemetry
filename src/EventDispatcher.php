@@ -74,6 +74,9 @@ class EventDispatcher {
 		// Normalize the payload
 		$payload = $this->normalizePayload( $event, $properties );
 
+		// Add system info to the payload
+		$payload = $this->addSystemInfo( $payload );
+
 		// Validate the payload
 		if ( ! $this->validatePayload( $payload ) ) {
 			return false;
@@ -167,8 +170,7 @@ class EventDispatcher {
 	/**
 	 * Add system information to the payload
 	 *
-	 * Adds PHP version, WordPress version, MySQL version, and server software
-	 * to the event properties using the Utils class.
+	 * Adds minimal system information to the event properties.
 	 *
 	 * @param array $payload Event payload.
 	 *
@@ -176,11 +178,6 @@ class EventDispatcher {
 	 * @since 1.0.0
 	 */
 	private function addSystemInfo( array $payload ): array {
-		$payload['properties']['php_version']     = Utils::getPhpVersion();
-		$payload['properties']['wp_version']      = Utils::getWordPressVersion();
-		$payload['properties']['mysql_version']   = Utils::getMySqlVersion();
-		$payload['properties']['server_software'] = Utils::getServerSoftware();
-
 		return $payload;
 	}
 

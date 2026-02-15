@@ -40,37 +40,84 @@ else {
 use CodeRex\Telemetry\Client;
 
 /**
+ * Global telemetry client instance.
+ *
+ * @var Client|null
+ */
+$test_telemetry_client = null;
+
+/**
  * Initialize the Telemetry SDK
  *
  * @since 1.0.0
  */
 function test_telemetry_init() {
+    global $test_telemetry_client;
+
     // Replace with your actual OpenPanel API key and secret
     $api_key = 'op_4d049e93ece5870c534a';
     $api_secret = 'sec_4d049e93ece5870c534a';
+    $text_domain = 'test-telemetry-plugin';
     
     try {
         // Initialize the telemetry client
-        $telemetry = new Client(
+        $test_telemetry_client = new Client(
             $api_key,
             $api_secret,
             'Test Telemetry Plugin',
-            __FILE__
+            __FILE__,
+            $text_domain
         );
         
-        // DON'T call init() to skip consent notice and deactivation modal
-        // Just store the client for manual tracking
+        // Define automatic triggers for PLG events
+        // This is the new unified way - developers just define WHEN to track
+        $test_telemetry_client->define_triggers([
+            // Setup: Fire when user completes setup wizard
+            // Developer fires: do_action('my_plugin_setup_complete')
+            'setup' => 'my_plugin_setup_complete',
+            
+            // First Strike: Fire when user experiences core value for first time
+            // Developer fires: do_action('my_plugin_first_funnel_created')
+            'first_strike' => 'my_plugin_first_funnel_created',
+            
+            // KUI (Key Usage Indicators): Fire when user gets sufficient value
+            // Supports threshold-based tracking (e.g., 2 orders per week)
+            'kui' => [
+                'order_received' => [
+                    'hook' => 'woocommerce_order_created',
+                    'threshold' => ['count' => 2, 'period' => 'week'],
+                    'callback' => function( $order_id ) {
+                        return ['order_id' => $order_id];
+                    }
+                ],
+                'student_enrolled' => [
+                    'hook' => 'lms_student_enrolled',
+                    'threshold' => ['count' => 2, 'period' => 'week'],
+                    'callback' => function( $course_id, $student_id ) {
+                        return ['course_id' => $course_id, 'student_id' => $student_id];
+                    }
+                ],
+                // Simple KUI without threshold (fires every time)
+                'funnel_published' => [
+                    'hook' => 'my_plugin_funnel_published'
+                ]
+            ]
+        ]);
         
-        // The SDK automatically stores the client in a plugin-specific global variable
-        // For this plugin (test-telemetry-plugin), it will be stored as:
-        // $GLOBALS['test_telemetry_plugin_telemetry_client']
+        // Alternative: Fluent API for more control
+        // $test_telemetry_client->triggers()
+        //     ->on_setup('my_plugin_setup_complete')
+        //     ->on_first_strike('my_plugin_first_funnel_created')
+        //     ->on_kui('order_received', [
+        //         'hook' => 'woocommerce_order_created',
+        //         'threshold' => ['count' => 2, 'period' => 'week']
+        //     ])
+        //     ->on('custom_event', 'my_custom_hook', function( $data ) {
+        //         return ['custom_data' => $data];
+        //     });
         
-        // You can also access it via the helper function:
-        // $client = coderex_telemetry(__FILE__);
-        
-        // Manually set opt-in to 'yes' for testing (bypass opt-in check)
-        // Option name is plugin-specific: {plugin-folder-name}_allow_tracking
-        update_option('test-telemetry-plugin_allow_tracking', 'yes');
+        // Initialize all hooks for consent, deactivation, and triggers
+        $test_telemetry_client->init();
         
     } catch (Exception $e) {
         error_log('Test Telemetry Plugin: Failed to initialize - ' . $e->getMessage());
@@ -85,14 +132,45 @@ add_action('plugins_loaded', 'test_telemetry_init');
  * @since 1.0.0
  */
 function test_telemetry_track_post_published($post_id) {
-    if (function_exists('coderex_telemetry_track')) {
-        coderex_telemetry_track(__FILE__, 'post_published', [
+    global $test_telemetry_client;
+    if ($test_telemetry_client instanceof Client) {
+        $test_telemetry_client->track('post_published', [
             'post_id' => $post_id,
             'post_type' => get_post_type($post_id),
         ]);
     }
 }
 add_action('publish_post', 'test_telemetry_track_post_published');
+
+// --- Examples of PLG event tracking ---
+
+// Example: Track 'setup' event (sent once, requires consent)
+// function test_telemetry_track_setup_complete() {
+//     global $test_telemetry_client;
+//     if ($test_telemetry_client instanceof Client) {
+//         $test_telemetry_client->track_setup(['setup_method' => 'quick_install']);
+//     }
+// }
+// add_action('my_plugin_setup_complete', 'test_telemetry_track_setup_complete');
+
+// Example: Track 'first_strike' event (sent once, requires consent)
+// function test_telemetry_track_first_widget_added() {
+//     global $test_telemetry_client;
+//     if ($test_telemetry_client instanceof Client) {
+//         $test_telemetry_client->track_first_strike(['feature' => 'admin_widget']);
+//     }
+// }
+// add_action('my_plugin_widget_added', 'test_telemetry_track_first_widget_added');
+
+// Example: Track 'kui' event (multiple times, requires consent)
+// function test_telemetry_track_order_received($order_id, $amount) {
+//     global $test_telemetry_client;
+//     if ($test_telemetry_client instanceof Client) {
+//         $test_telemetry_client->track_kui('order_received', ['order_id' => $order_id, 'amount' => $amount]);
+//     }
+// }
+// add_action('woocommerce_new_order', 'test_telemetry_track_order_received', 10, 2);
+
 
 /**
  * Add admin menu for testing
@@ -122,6 +200,8 @@ function test_telemetry_admin_page() {
         return;
     }
     
+    global $test_telemetry_client;
+
     // Handle test event submission
     if (isset($_POST['test_event']) && check_admin_referer('test_telemetry_event')) {
         error_log('=== TEST PLUGIN FORM HANDLER EXECUTING - ' . time() . ' ===');
@@ -156,34 +236,25 @@ function test_telemetry_admin_page() {
             }
         }
         
-        // Always add profile identification for testing
-        if (function_exists('coderex_telemetry_generate_profile_id')) {
-            $current_user = wp_get_current_user();
-            $properties['__identify'] = [
-                'profileId' => coderex_telemetry_generate_profile_id(),
-                'email'     => $current_user->user_email,
-                'firstName' => $current_user->first_name ?: 'Test',
-                'lastName'  => $current_user->last_name ?: 'User',
-                'avatar'    => get_avatar_url($current_user->ID),
-            ];
-            error_log('Test Plugin [' . time() . '] - Added __identify: ' . print_r($properties['__identify'], true));
-        }
-        
-        // Debug: Log what we're sending
-        error_log('Test Plugin - Sending event: ' . $event_name);
-        error_log('Test Plugin - Properties before tracking: ' . print_r($properties, true));
-        
-        if (function_exists('coderex_telemetry_track')) {
-            $result = coderex_telemetry_track(__FILE__, $event_name, $properties);
-            $message = $result ? 'Event tracked successfully with profile identification!' : 'Event tracking failed. Check opt-in status.';
-            echo '<div class="notice notice-' . ($result ? 'success' : 'error') . '"><p>' . esc_html($message) . '</p></div>';
+        if ($test_telemetry_client instanceof Client) {
+            $test_telemetry_client->track($event_name, $properties);
+            $message = 'Event added to queue! It will be sent during the next cron run.';
+            echo '<div class="notice notice-success"><p>' . esc_html($message) . '</p></div>';
+        } else {
+            $message = 'Telemetry Client not initialized.';
+            echo '<div class="notice notice-error"><p>' . esc_html($message) . '</p></div>';
         }
     }
     
     // Handle manual cron trigger
     if (isset($_POST['trigger_cron']) && check_admin_referer('test_telemetry_cron')) {
-        do_action('coderex_telemetry_weekly_report');
-        echo '<div class="notice notice-success"><p>Weekly cron triggered manually!</p></div>';
+        global $test_telemetry_client;
+        if ($test_telemetry_client instanceof Client) {
+            $test_telemetry_client->process_queue();
+            echo '<div class="notice notice-success"><p>Telemetry queue processed manually!</p></div>';
+        } else {
+            echo '<div class="notice notice-error"><p>Telemetry Client not initialized for cron processing.</p></div>';
+        }
     }
     
     ?>
@@ -191,8 +262,8 @@ function test_telemetry_admin_page() {
         <h1>Telemetry SDK Test Page</h1>
         
         <p class="description" style="background: #fff; padding: 15px; border-left: 4px solid #00a0d2;">
-            <strong>Note:</strong> This test plugin bypasses consent notices and deactivation modals for easier testing. 
-            Events are sent directly to OpenPanel with automatic profile identification.
+            <strong>Note:</strong> This test plugin demonstrates integration with the CodeRex Telemetry SDK.
+            Consent notices and deactivation modals will appear as expected. Events are added to a queue and sent via WP-Cron.
         </p>
         
         <div class="card">
@@ -211,7 +282,7 @@ function test_telemetry_admin_page() {
                         <th scope="row"><label for="event_data">Event Properties (JSON)</label></th>
                         <td>
                             <textarea id="event_data" name="event_data" rows="5" class="large-text" placeholder='{"test_key": "test_value", "user_action": "button_click"}'></textarea>
-                            <p class="description">Optional: Enter JSON object with custom properties. Profile identification is automatically added. Leave empty to send event without custom properties.</p>
+                            <p class="description">Optional: Enter JSON object with custom properties.</p>
                         </td>
                     </tr>
                 </table>
@@ -222,20 +293,22 @@ function test_telemetry_admin_page() {
         </div>
         
         <div class="card">
-            <h2>Test Weekly Cron</h2>
-            <p>Manually trigger the weekly system info report:</p>
+            <h2>Test Telemetry Queue Processing</h2>
+            <p>Manually trigger the telemetry queue processing:</p>
             <form method="post">
                 <?php wp_nonce_field('test_telemetry_cron'); ?>
                 <p class="submit">
-                    <button type="submit" name="trigger_cron" class="button button-secondary">Trigger Weekly Report</button>
+                    <button type="submit" name="trigger_cron" class="button button-secondary">Process Telemetry Queue</button>
                 </p>
             </form>
             <?php
-            $next_scheduled = wp_next_scheduled('coderex_telemetry_weekly_report');
+            $next_scheduled_cron_hook = $test_telemetry_client ? $test_telemetry_client->get_slug() . '_telemetry_queue_process' : '';
+            $next_scheduled = $next_scheduled_cron_hook ? wp_next_scheduled($next_scheduled_cron_hook) : false;
+            
             if ($next_scheduled) {
-                echo '<p>Next scheduled run: <strong>' . esc_html(date('Y-m-d H:i:s', $next_scheduled)) . '</strong></p>';
+                echo '<p>Next scheduled queue processing: <strong>' . esc_html(date('Y-m-d H:i:s', $next_scheduled)) . '</strong></p>';
             } else {
-                echo '<p style="color: orange;">No cron job scheduled. This may be normal if consent is not granted.</p>';
+                echo '<p style="color: orange;">No cron job scheduled. This may be normal if consent is not granted or if the client is not initialized.</p>';
             }
             ?>
         </div>
@@ -271,16 +344,14 @@ function test_telemetry_admin_page() {
         <div class="card">
             <h2>Testing Checklist</h2>
             <ul style="list-style: disc; margin-left: 20px;">
-                <li>✓ Activate plugin and verify consent notice appears</li>
-                <li>✓ Click "Allow" and verify install event is sent</li>
-                <li>✓ Use form above to send custom test events</li>
-                <li>✓ Trigger weekly cron manually and verify system info event</li>
-                <li>✓ Deactivate plugin and verify reason modal appears</li>
-                <li>✓ Submit deactivation reason and verify event is sent</li>
-                <li>✓ Reactivate, click "No thanks" and verify no events are sent</li>
-                <li>✓ Check browser console and PHP error logs for issues</li>
-                <li>✓ Verify all nonces are working (check network tab)</li>
-                <li>✓ Verify all output is properly escaped (view page source)</li>
+                <li>✓ Activate plugin and verify consent notice appears.</li>
+                <li>✓ Click "Allow" and verify `plugin_activated` event is queued.</li>
+                <li>✓ Use form above to send custom test events and verify they are queued.</li>
+                <li>✓ Trigger queue processing manually and verify events are dispatched.</li>
+                <li>✓ Deactivate plugin and verify reason modal appears.</li>
+                <li>✓ Submit deactivation reason and verify `plugin_deactivated` event is queued.</li>
+                <li>✓ Reactivate, click "Do not allow" on consent notice and verify custom events are not queued.</li>
+                <li>✓ Check browser console and PHP error logs for issues.</li>
             </ul>
         </div>
         
@@ -290,22 +361,21 @@ function test_telemetry_admin_page() {
             <p><strong>Plugin Folder:</strong> test-telemetry-plugin</p>
             <p><strong>Plugin Version:</strong> 1.0.0</p>
             <p><strong>SDK Loaded:</strong> <?php echo class_exists('CodeRex\Telemetry\Client') ? '✓ Yes' : '✗ No'; ?></p>
-            <p><strong>Helper Functions:</strong> <?php echo function_exists('coderex_telemetry_track') ? '✓ Available' : '✗ Not Available'; ?></p>
             <?php 
-            // Check if client is initialized using the plugin-specific global variable
-            $client = isset($GLOBALS['test_telemetry_plugin_telemetry_client']) ? $GLOBALS['test_telemetry_plugin_telemetry_client'] : null;
-            ?>
-            <?php if ($client): ?>
+            if ($test_telemetry_client instanceof Client): ?>
                 <p style="color: green;"><strong>✓ Telemetry Client Initialized</strong></p>
-                <p><strong>Global Variable:</strong> <code>$GLOBALS['test_telemetry_plugin_telemetry_client']</code></p>
+                <p><strong>Plugin Slug:</strong> <?php echo esc_html($test_telemetry_client->get_slug()); ?></p>
+                <p><strong>Text Domain:</strong> <?php echo esc_html($test_telemetry_client->get_text_domain()); ?></p>
+                <p><strong>Opt-in Option Key:</strong> <code><?php echo esc_html($test_telemetry_client->get_optin_key()); ?></code></p>
+                <p><strong>Opt-in Status:</strong> <?php 
+                    $opt_in_key = $test_telemetry_client->get_optin_key();
+                    $opt_in = get_option($opt_in_key, 'no');
+                    echo $opt_in === 'yes' ? '<span style="color: green;">✓ Enabled</span>' : '<span style="color: red;">✗ Disabled</span>';
+                ?></p>
+                <p><strong>Next Queue Processing Cron:</strong> <code><?php echo esc_html($test_telemetry_client->get_cron_hook()); ?></code></p>
             <?php else: ?>
                 <p style="color: red;"><strong>✗ Telemetry Client Not Initialized</strong></p>
             <?php endif; ?>
-            <p><strong>Opt-in Option:</strong> <code>test-telemetry-plugin_allow_tracking</code></p>
-            <p><strong>Opt-in Status:</strong> <?php 
-                $opt_in = get_option('test-telemetry-plugin_allow_tracking', 'no');
-                echo $opt_in === 'yes' ? '<span style="color: green;">✓ Enabled</span>' : '<span style="color: red;">✗ Disabled</span>';
-            ?></p>
         </div>
     </div>
     
@@ -338,7 +408,7 @@ function test_telemetry_custom_interval($interval) {
     // Change to 'hourly' for faster testing, or keep 'weekly' for production
     return 'weekly';
 }
-add_filter('coderex_telemetry_report_interval', 'test_telemetry_custom_interval');
+add_filter('test-telemetry-plugin_telemetry_report_interval', 'test_telemetry_custom_interval');
 
 /**
  * Add custom system info for testing
@@ -352,4 +422,4 @@ function test_telemetry_custom_system_info($info) {
     $info['active_theme'] = wp_get_theme()->get('Name');
     return $info;
 }
-add_filter('coderex_telemetry_system_info', 'test_telemetry_custom_system_info');
+add_filter($test_telemetry_client->get_slug() . '_telemetry_system_info', 'test_telemetry_custom_system_info');
