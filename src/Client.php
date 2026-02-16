@@ -143,6 +143,24 @@ class Client {
     }
 
     /**
+     * Track a lifecycle event without consent requirement
+     *
+     * Sends lifecycle events (activation, deactivation) to OpenPanel
+     * without requiring user opt-in. These are essential operational
+     * telemetry events that don't track user behavior.
+     *
+     * @param string $event Event name (e.g., 'plugin_activation', 'plugin_deactivated').
+     * @param array  $properties Event properties (optional).
+     *
+     * @return bool True on success, false on failure.
+     * @since 1.0.0
+     */
+    public function trackLifecycle( string $event, array $properties = array() ): bool {
+        // No opt-in check - lifecycle events are always tracked
+        return $this->dispatcher->dispatch( $event, $properties );
+    }
+
+    /**
      * Check if opt-in is enabled
      *
      * Checks if the user has opted in to telemetry tracking.

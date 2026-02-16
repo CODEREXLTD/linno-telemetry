@@ -48,6 +48,39 @@ if (!function_exists('coderex_telemetry_track')) {
     }
 }
 
+if (!function_exists('coderex_telemetry_track_lifecycle')) {
+    /**
+     * Track a lifecycle event without requiring user consent
+     *
+     * This function tracks essential lifecycle events (activation, deactivation)
+     * without requiring user opt-in. These events are minimal operational telemetry
+     * that don't track user behavior or PII.
+     *
+     * Use this ONLY for critical lifecycle events like:
+     * - plugin_activation
+     * - plugin_deactivated
+     *
+     * For all other events (feature usage, user actions), use coderex_telemetry_track()
+     * which requires user consent.
+     *
+     * @param string $plugin_file The main plugin file path (use __FILE__ from your main plugin file)
+     * @param string $event The lifecycle event name (e.g., 'plugin_activation')
+     * @param array  $properties Optional array of event properties
+     *
+     * @return bool True if event was sent successfully, false otherwise
+     * @since 1.0.0
+     */
+    function coderex_telemetry_track_lifecycle(string $plugin_file, string $event, array $properties = []): bool {
+        $client = coderex_telemetry($plugin_file);
+
+        if ($client === null) {
+            return false;
+        }
+
+        return $client->trackLifecycle($event, $properties);
+    }
+}
+
 if (!function_exists('coderex_telemetry_generate_profile_id')) {
     /**
      * Generate a UUID v4 for profile identification
