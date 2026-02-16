@@ -121,6 +121,15 @@ class Client {
      */
     private string $textDomain;
 
+    /**
+     * Unique identifier for the site
+     *
+     * @var string
+     * @since 1.0.0
+     */
+    private string $unique_id;
+
+
 
     /**
      * Constructor
@@ -150,6 +159,7 @@ class Client {
         $this->pluginVersion= Utils::getPluginVersion( $pluginFile );
         $this->textDomain   = $textDomain;
         $this->set_slug();
+        $this->unique_id    = $this->get_or_create_unique_id(); // Initialize unique ID
 
         // Initialize OpenPanelDriver with API key
         $driver = new OpenPanelDriver();
@@ -189,8 +199,6 @@ class Client {
         $this->consent->init();
         $this->deactivation->init();
         $this->init_triggers();
-        
-        register_activation_hook( $this->pluginFile, [ $this, 'activate' ] );
     }
 
     /**
@@ -200,7 +208,7 @@ class Client {
      */
     public function activate(): void {
         $this->queue->create_table();
-        $this->track( 'plugin_activated', [], true );
+        $this->track( 'plugin_activated', [ 'site_url' => get_site_url(), 'unique_id' => $this->unique_id ], true );
     }
 
 
@@ -273,6 +281,15 @@ class Client {
      */
     public function get_plugin_name(): string {
         return $this->pluginName;
+    }
+
+    /**
+     * Get the unique ID for the site.
+     *
+     * @return string
+     */
+    public function get_unique_id(): string {
+        return $this->unique_id;
     }
 
     /**
@@ -504,5 +521,22 @@ class Client {
      */
     private function set_slug() {
         $this->slug = dirname( plugin_basename( $this->pluginFile ) );
+    }
+
+    /**
+     * Get or create a unique ID for the site.
+     *
+     * @return string
+     */
+    private function get_or_create_unique_id(): string {
+        $option_name = $this->slug . '_telemetry_unique_id';
+        $unique_id = get_option( $option_name );
+
+        if ( empty( $unique_id ) ) {
+            $unique_id = function_exists( 'wp_generate_uuid4' ) ? wp_generate_uuid4() : uniqid();
+            update_option( $option_name, $unique_id, false );
+        }
+
+        return $unique_id;
     }
 }

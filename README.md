@@ -18,7 +18,7 @@ The SDK's core purpose is to handle data transmission securely and ethically. De
 
 -   **Privacy-First**: Enforces user consent before sending most data (lifecycle events do not require consent).
 -   **Easy Integration**: Simple API with just a few lines of code.
--   **Automatic Lifecycle Events**: Automatically tracks plugin activation and deactivation (including reason).
+-   **Lifecycle Events**: Tracks plugin activation via a standard WordPress hook and automatically handles the deactivation feedback form.
 -   **Automatic PLG Tracking**: Define triggers once, library automatically tracks setup, first strike, and KUI events.
 -   **Threshold-Based KUI**: Automatically track when users hit usage thresholds (e.g., 2 orders per week).
 -   **Custom Events**: Track plugin-specific events with custom properties.
@@ -127,38 +127,25 @@ $telemetry_client->define_triggers([
     ]
 ]);
 
-// Initialize all hooks for consent, deactivation, and triggers
+// IMPORTANT: Register activation hook
+// This is necessary to create the database table and track the activation event.
+register_activation_hook(__FILE__, [$telemetry_client, 'activate']);
+
+// Initialize all other hooks for consent, deactivation, and triggers
 $telemetry_client->init();
-```
 
-### Alternative: Fluent API
+// Note on deactivation:
+// The deactivation feedback modal is handled automatically by the library.
+// You do NOT need to call register_deactivation_hook for it to work.
 
-For more control, use the fluent API:
-
-```php
-$telemetry_client->triggers()
-    ->on_setup('my_plugin_setup_complete')
-    ->on_first_strike('my_plugin_first_funnel_created')
-    ->on_kui('order_received', [
-        'hook' => 'woocommerce_order_created',
-        'threshold' => ['count' => 2, 'period' => 'week'],
-        'callback' => function( $order_id ) {
-            return ['order_id' => $order_id];
-        }
-    ])
-    ->on('custom_event', 'my_custom_hook', function( $data ) {
-        return ['custom_data' => $data];
-    });
-
-$telemetry_client->init();
 ```
 
 ### What Happens Next?
 
-1.  **Automatic Activation Tracking**: The SDK tracks `plugin_activated` upon plugin activation (no consent needed).
+1.  **Plugin Activation**: When you activate the plugin, the `register_activation_hook` will trigger the `activate` method in the SDK. This tracks the `plugin_activated` event (no consent needed) and creates a database table for the event queue.
 2.  **User Consent Notice**: For new installations, an admin notice will ask the user for consent to track usage data.
 3.  **User Choice**: If the user allows, PLG events (setup, first strike, KUI) and custom events will be tracked automatically based on your trigger configuration. If not, only non-consent events are tracked.
-4.  **Deactivation Feedback**: Upon deactivation, a modal will prompt the user for a reason, which is tracked (no consent needed).
+4.  **Deactivation Feedback**: Upon deactivation, a modal will prompt the user for a reason, which is tracked (no consent needed). This is handled automatically by the library when you call `$telemetry_client->init()`.
 5.  **Asynchronous Sending**: All events (requiring consent or not) are added to a local queue and sent to OpenPanel in batches via a daily WP-Cron job.
 
 ## Trigger System
