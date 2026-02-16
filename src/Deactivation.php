@@ -388,7 +388,7 @@ class Deactivation {
      * @return array
      */
     private function get_uninstall_reasons(): array {
-        return [
+        $reasons = [
             [
                 'id'          => 'could-not-understand',
                 'text'        => __( "Couldn't understand", 'text-domain' ),
@@ -432,6 +432,8 @@ class Deactivation {
                 'icon'        => '<svg xmlns="http://www.w3.org/2000/svg" width="24" height="23" viewBox="0 0 24 6"><g fill="none"><g fill="#3B86FF"><path d="M3 0C4.7 0 6 1.3 6 3 6 4.7 4.7 6 3 6 1.3 6 0 4.7 0 3 0 1.3 1.3 0 3 0ZM12 0C13.7 0 15 1.3 15 3 15 4.7 13.7 6 12 6 10.3 6 9 4.7 9 3 9 1.3 10.3 0 12 0ZM21 0C22.7 0 24 1.3 24 3 24 4.7 22.7 6 21 6 19.3 6 18 4.7 18 3 18 1.3 19.3 0 21 0Z"/></g></g></svg>',
             ],
         ];
+
+        return apply_filters( $this->client->get_slug() . '_telemetry_deactivation_reasons', $reasons );
     }
 }
 

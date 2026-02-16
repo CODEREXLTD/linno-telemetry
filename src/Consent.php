@@ -95,12 +95,18 @@ class Consent {
         <div class="notice notice-info">
             <p>
                 <?php
-                printf(
-                    __( 'Want to help make %1$s even better? Allow %1$s to collect non-sensitive usage data to help us improve the plugin. No sensitive data is collected.', $this->textDomain ),
-                    '<strong>' . $plugin_name . '</strong>'
+                $privacy_policy_url = '#'; // Placeholder, replace with actual privacy policy URL
+                $message = apply_filters(
+                    $this->client->get_slug() . '_telemetry_consent_message',
+                    sprintf(
+                        __( 'Help us improve %1$s! Allow the plugin to collect anonymous usage data to help us improve the plugin. We do not collect any sensitive data or your admin email. Your privacy is important, and you will always remain anonymous. <a href="%2$s" target="_blank">Learn more</a>.', $this->textDomain ),
+                        '<strong>' . $plugin_name . '</strong>',
+                        esc_url( $privacy_policy_url )
+                    )
                 );
+                
+                echo '<p>' . $message . '</p>';
                 ?>
-            </p>
             <p>
                 <a href="<?php echo esc_url( $optin_url ); ?>" class="button-primary"><?php _e( 'Allow', $this->textDomain ); ?></a>
                 <a href="<?php echo esc_url( $optout_url ); ?>" class="button-secondary"><?php _e( 'Do not allow', $this->textDomain ); ?></a>
