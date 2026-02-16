@@ -208,7 +208,14 @@ class Client {
      */
     public function activate(): void {
         $this->queue->create_table();
-        $this->track( 'plugin_activated', [ 'site_url' => get_site_url(), 'unique_id' => $this->unique_id ], true );
+        update_option( $this->slug . '_telemetry_activation_pending', 'yes', false );
+
+        // If the user is already opted-in, track the activation event immediately
+        // as the consent modal won't be shown again.
+        if ( $this->isOptInEnabled() ) {
+            $this->track( 'plugin_activated', [ 'site_url' => get_site_url(), 'unique_id' => $this->unique_id ] );
+            delete_option( $this->slug . '_telemetry_activation_pending' );
+        }
     }
 
 
@@ -290,6 +297,23 @@ class Client {
      */
     public function get_unique_id(): string {
         return $this->unique_id;
+    }
+
+    /**
+     * Get the client instance for a specific plugin
+     *
+     * Static method to retrieve the telemetry client for a plugin.
+     *
+     * @param string $plugin_file The main plugin file path
+     * @return Client|null The client instance or null if not found
+     * @since 1.0.0
+     */
+    public static function getInstance( string $plugin_file ): ?Client {
+        $base_name = plugin_basename( $plugin_file );
+        $slug = dirname( $base_name );
+        $safe_slug = str_replace( '-', '_', $slug );
+        $global_name = $safe_slug . '_telemetry_client';
+        return $GLOBALS[ $global_name ] ?? null;
     }
 
     /**
@@ -448,8 +472,8 @@ class Client {
 
         // Schedule cron job if not already scheduled
         if ( ! wp_next_scheduled( $hook ) ) {
-            // Apply filter for customizable interval (default: weekly)
-            $interval = apply_filters( $this->slug . '_telemetry_report_interval', 'weekly' );
+            // Apply filter for customizable interval (default: daily)
+            $interval = apply_filters( $this->slug . '_telemetry_report_interval', 'daily' );
 
             // Schedule the event
             wp_schedule_event( time(), $interval, $hook );
@@ -505,6 +529,7 @@ class Client {
 
             if ( $result ) {
                 $ids_to_delete[] = $event->id;
+                update_option( $this->slug . '_telemetry_last_send', time(), false );
             }
         }
 

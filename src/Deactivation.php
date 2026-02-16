@@ -379,7 +379,7 @@ class Deactivation {
         $this->client->track( 'plugin_deactivated', [
             'reason_id' => $reason_id,
             'reason_info' => $reason_info,
-        ], true );
+        ] );
     }
 
     /**
