@@ -56,7 +56,7 @@ class Consent {
 
             // If a plugin activation was pending due to lack of consent, track it now
             if ( 'yes' === get_option( $this->client->get_slug() . '_telemetry_activation_pending' ) ) {
-                $this->client->track( 'plugin_activated', [ 'site_url' => get_site_url(), 'unique_id' => $this->client->get_unique_id() ] );
+                $this->client->track_immediate( 'plugin_activated', [ 'site_url' => get_site_url(), 'unique_id' => $this->client->get_unique_id() ] );
                 delete_option( $this->client->get_slug() . '_telemetry_activation_pending' );
             }
         }

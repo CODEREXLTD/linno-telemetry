@@ -213,11 +213,58 @@ class Client {
         // If the user is already opted-in, track the activation event immediately
         // as the consent modal won't be shown again.
         if ( $this->isOptInEnabled() ) {
-            $this->track( 'plugin_activated', [ 'site_url' => get_site_url(), 'unique_id' => $this->unique_id ] );
+            $this->track_immediate( 'plugin_activated', [ 'site_url' => get_site_url(), 'unique_id' => $this->unique_id ] );
             delete_option( $this->slug . '_telemetry_activation_pending' );
         }
     }
 
+    /**
+     * Plugin deactivation hook.
+     *
+     * This method should be called from the plugin's deactivation hook.
+     * It clears all pending events for this plugin from the queue.
+     *
+     * @return void
+     * @since 1.0.1
+     */
+    public function deactivate(): void {
+        // Check if the deactivation event was already sent by the feedback form
+        $transient_key = $this->get_slug() . '_deactivation_event_sent';
+        if ( 'yes' !== get_transient( $transient_key ) ) {
+            // Send a generic deactivation event if the feedback form didn't send one
+            $this->track_immediate( 'plugin_deactivated', [ 'site_url' => get_site_url(), 'unique_id' => $this->unique_id, 'feedback_provided' => false ] );
+        }
+        // Clean up the transient regardless
+        delete_transient( $transient_key );
+
+        $this->queue->clear_for_plugin( $this->slug );
+    }
+
+
+    /**
+     * Track an event immediately
+     *
+     * Sends an event directly without adding it to the queue.
+     *
+     * @param string $event Event name.
+     * @param array $properties Event properties (optional).
+     * @param bool $override Whether to override the opt-in check.
+     *
+     * @return void
+     * @since 1.0.1
+     */
+    public function track_immediate( string $event, array $properties = array(), bool $override = false ): void {
+        // Check if opt-in is enabled
+        if ( ! $override && ! $this->isOptInEnabled() ) {
+            return;
+        }
+
+        $result = $this->dispatcher->dispatch( $event, $properties );
+
+        if ( $result ) {
+            update_option( $this->slug . '_telemetry_last_send', time(), false );
+        }
+    }
 
     /**
      * Track a custom event
@@ -238,7 +285,7 @@ class Client {
         }
 
         // Add event to queue
-        $this->queue->add( $event, $properties );
+        $this->queue->add( $this->slug, $event, $properties );
     }
 
     /**
@@ -515,7 +562,7 @@ class Client {
      * @since 1.0.0
      */
     public function process_queue(): void {
-        $events = $this->queue->get_all();
+        $events = $this->queue->get_all( $this->slug );
 
         if ( empty( $events ) ) {
             return;

@@ -28,10 +28,12 @@ class Queue {
 
         $sql = "CREATE TABLE IF NOT EXISTS {$this->table_name} (
             id mediumint(9) NOT NULL AUTO_INCREMENT,
+            plugin_slug varchar(255) NOT NULL,
             event varchar(255) NOT NULL,
             properties longtext NOT NULL,
             timestamp datetime DEFAULT '0000-00-00 00:00:00' NOT NULL,
-            PRIMARY KEY  (id)
+            PRIMARY KEY  (id),
+            INDEX plugin_slug_index (plugin_slug)
         ) $charset_collate;";
 
         require_once( ABSPATH . 'wp-admin/includes/upgrade.php' );
@@ -45,12 +47,13 @@ class Queue {
      * @param array $properties
      * @return void
      */
-    public function add( string $event, array $properties ): void {
+    public function add( string $plugin_slug, string $event, array $properties ): void {
         global $wpdb;
 
         $wpdb->insert(
             $this->table_name,
             [
+                'plugin_slug' => $plugin_slug,
                 'event'      => $event,
                 'properties' => wp_json_encode( $properties ),
                 'timestamp'  => current_time( 'mysql' ),
@@ -63,10 +66,15 @@ class Queue {
      *
      * @return array
      */
-    public function get_all(): array {
+    public function get_all( string $plugin_slug ): array {
         global $wpdb;
 
-        $results = $wpdb->get_results( "SELECT * FROM {$this->table_name} ORDER BY timestamp ASC" );
+        $results = $wpdb->get_results(
+            $wpdb->prepare(
+                "SELECT * FROM {$this->table_name} WHERE plugin_slug = %s ORDER BY timestamp ASC",
+                $plugin_slug
+            )
+        );
 
         return $results;
     }
@@ -83,5 +91,22 @@ class Queue {
         $ids = implode( ',', array_map( 'absint', $ids ) );
 
         $wpdb->query( "DELETE FROM {$this->table_name} WHERE id IN ($ids)" );
+    }
+
+    /**
+     * Clear all events for a specific plugin from the queue.
+     *
+     * @param string $plugin_slug The slug of the plugin whose events should be cleared.
+     * @return void
+     */
+    public function clear_for_plugin( string $plugin_slug ): void {
+        global $wpdb;
+
+        $wpdb->query(
+            $wpdb->prepare(
+                "DELETE FROM {$this->table_name} WHERE plugin_slug = %s",
+                $plugin_slug
+            )
+        );
     }
 }
