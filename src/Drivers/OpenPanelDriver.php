@@ -107,71 +107,7 @@ class OpenPanelDriver implements DriverInterface {
 			'openpanel-client-id'     => $this->apiKey,
 			'openpanel-client-secret' => $this->apiSecret,
 			'Content-Type'            => 'application/json',
-			'user-agent'              => $this->getClientUserAgent(),
-			'x-client-ip'             => $this->getClientIp(),
 		);
-	}
-
-	/**
-	 * Get the client's User-Agent string from their browser
-	 *
-	 * @return string The client's User-Agent string.
-	 * @since 1.0.0
-	 */
-	private function getClientUserAgent(): string {
-		if ( ! empty( $_SERVER['HTTP_USER_AGENT'] ) ) {
-			return sanitize_text_field( wp_unslash( $_SERVER['HTTP_USER_AGENT'] ) );
-		}
-
-		return sprintf(
-			'coderex-telemetry/%s (WordPress/%s; PHP/%s; %s)',
-			'1.0.0',
-			get_bloginfo( 'version' ),
-			PHP_VERSION,
-			parse_url( home_url(), PHP_URL_HOST )
-		);
-	}
-
-	/**
-	 * Get the client's IP address
-	 *
-	 * @return string The client's IP address.
-	 * @since 1.0.0
-	 */
-	private function getClientIp(): string {
-		// Check for IP from various sources (in order of reliability)
-		$ip_keys = array(
-			'HTTP_CF_CONNECTING_IP', // Cloudflare
-			'HTTP_X_REAL_IP',        // Nginx proxy
-			'HTTP_X_FORWARDED_FOR',  // Standard proxy header
-			'HTTP_CLIENT_IP',        // Shared internet/ISP IP
-			'REMOTE_ADDR',           // Direct connection
-		);
-
-		foreach ( $ip_keys as $key ) {
-			if ( ! empty( $_SERVER[ $key ] ) ) {
-				$ip = sanitize_text_field( wp_unslash( $_SERVER[ $key ] ) );
-
-				// Handle comma-separated IPs (X-Forwarded-For can have multiple)
-				if ( strpos( $ip, ',' ) !== false ) {
-					$ip_list = explode( ',', $ip );
-					$ip      = trim( $ip_list[0] ); // Get the first (original client) IP
-				}
-
-				// Validate IP address
-				if ( filter_var( $ip, FILTER_VALIDATE_IP, FILTER_FLAG_NO_PRIV_RANGE | FILTER_FLAG_NO_RES_RANGE ) ) {
-					return $ip;
-				}
-
-				// If validation fails but it's still an IP format, return it anyway
-				if ( filter_var( $ip, FILTER_VALIDATE_IP ) ) {
-					return $ip;
-				}
-			}
-		}
-
-		// Fallback to localhost if no IP found
-		return '127.0.0.1';
 	}
 
 	/**
@@ -204,17 +140,18 @@ class OpenPanelDriver implements DriverInterface {
 			$headers[] = "$key: $value";
 		}
 
-		// Set cURL options
+		// Set cURL options to match successful Postman request
 		curl_setopt_array( $ch, array(
 			CURLOPT_RETURNTRANSFER => true,
 			CURLOPT_POST           => true,
 			CURLOPT_POSTFIELDS     => $body,
 			CURLOPT_HTTPHEADER     => $headers,
-			CURLOPT_TIMEOUT        => 5,
-			CURLOPT_CONNECTTIMEOUT => 5,
+			CURLOPT_TIMEOUT        => 30,
+			CURLOPT_CONNECTTIMEOUT => 10,
 			CURLOPT_SSL_VERIFYPEER => true,
 			CURLOPT_SSL_VERIFYHOST => 2,
-			CURLOPT_FOLLOWLOCATION => false,
+			CURLOPT_FOLLOWLOCATION => true,
+			CURLOPT_HTTP_VERSION   => CURL_HTTP_VERSION_1_1,
 		) );
 
 		// Execute the request
