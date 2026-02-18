@@ -44,18 +44,27 @@ class EventDispatcher {
 	private $plugin_version;
 
 	/**
+	 * Unique identifier for the site
+	 *
+	 * @var string
+	 */
+	private $unique_id;
+
+	/**
 	 * Constructor
 	 *
 	 * @param DriverInterface $driver Driver instance for sending events.
 	 * @param string          $plugin_name Plugin name.
 	 * @param string          $plugin_version Plugin version.
+	 * @param string          $unique_id Unique identifier for the site.
 	 *
 	 * @since 1.0.0
 	 */
-	public function __construct( DriverInterface $driver, string $plugin_name, string $plugin_version ) {
+	public function __construct( DriverInterface $driver, string $plugin_name, string $plugin_version, string $unique_id ) {
 		$this->driver         = $driver;
 		$this->plugin_name    = $plugin_name;
 		$this->plugin_version = $plugin_version;
+		$this->unique_id      = $unique_id;
 	}
 
 	/**
@@ -113,6 +122,7 @@ class EventDispatcher {
 
 		// Add required fields with proper sanitization
 		$sanitized_properties['site_url']       = esc_url_raw( Utils::getSiteUrl() );
+		$sanitized_properties['unique_id']      = $this->unique_id;
 		$sanitized_properties['plugin_name']    = $this->plugin_name;
 		$sanitized_properties['plugin_version'] = $this->plugin_version;
 		$sanitized_properties['timestamp']      = Utils::getCurrentTimestamp();
@@ -208,7 +218,7 @@ class EventDispatcher {
 		$properties = $payload['properties'];
 
 		// Check required fields in properties
-		$required_fields = array( 'site_url', 'plugin_name', 'plugin_version', 'timestamp' );
+		$required_fields = array( 'site_url', 'unique_id', 'plugin_name', 'plugin_version', 'timestamp' );
 
 		foreach ( $required_fields as $field ) {
 			if ( empty( $properties[ $field ] ) || ! is_string( $properties[ $field ] ) ) {

@@ -169,7 +169,8 @@ class TriggerManager {
 
         if ( ! empty( $trigger['hook'] ) ) {
             $priority = $trigger['priority'] ?? 10;
-            $accepted_args = isset( $trigger['callback'] ) ? 10 : 1;
+            // Always accept up to 10 arguments to be safe with any WordPress hook
+            $accepted_args = 10;
 
             add_action(
                 $trigger['hook'],

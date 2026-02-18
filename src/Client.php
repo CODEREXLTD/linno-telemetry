@@ -91,7 +91,7 @@ class Client {
         $driver->setApiSecret( $apiSecret );
 
         // Initialize EventDispatcher
-        $this->handlers['dispatcher'] = new EventDispatcher( $driver, $pluginName, $this->config['pluginVersion'] );
+        $this->handlers['dispatcher'] = new EventDispatcher( $driver, $pluginName, $this->config['pluginVersion'], $this->config['unique_id'] );
 
         // Initialize other handlers
         $this->handlers['consent'] = new Consent( $this );
@@ -163,7 +163,7 @@ class Client {
 
         // If the user is already opted-in, track the activation event immediately
         // as the consent modal won't be shown again.
-        if ( $this->isOptInEnabled() && ! get_option( $this->config['slug'] . '_telemetry_activated_tracked' ) ) {
+        if ( $this->isOptInEnabled() ) {
             $this->track_immediate( 'plugin_activated', [ 'site_url' => get_site_url(), 'unique_id' => $this->config['unique_id'] ], true );
             update_option( $this->config['slug'] . '_telemetry_activated_tracked', 'yes' );
             delete_option( $this->config['slug'] . '_telemetry_activation_pending' );
@@ -221,6 +221,11 @@ class Client {
             return;
         }
 
+        // Add user identification context if not already present
+        if ( ! isset( $properties['__identify'] ) ) {
+            $properties['__identify'] = Utils::get_current_user_identify();
+        }
+
         $result = $this->handlers['dispatcher']->dispatch( $event, $properties );
 
         if ( $result ) {
@@ -248,6 +253,11 @@ class Client {
         // Check if opt-in is enabled
         if ( ! $override && ! $this->isOptInEnabled() ) {
             return;
+        }
+
+        // Add user identification context if not already present
+        if ( ! isset( $properties['__identify'] ) ) {
+            $properties['__identify'] = Utils::get_current_user_identify();
         }
 
         // Add event to queue

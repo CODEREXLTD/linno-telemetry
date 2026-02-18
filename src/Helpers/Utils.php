@@ -213,4 +213,30 @@ class Utils {
         
         return '0.0.0';
     }
+
+    /**
+     * Get the current user's identification data for telemetry.
+     *
+     * @return array Identification data with profileId and user info.
+     * @since 1.0.1
+     */
+    public static function get_current_user_identify(): array {
+        $identify = [
+            'profileId' => self::getSiteProfileId(),
+        ];
+
+        if ( function_exists( 'wp_get_current_user' ) ) {
+            $current_user = wp_get_current_user();
+            if ( $current_user && $current_user->ID > 0 ) {
+                $identify['email']     = $current_user->user_email;
+                $identify['firstName'] = $current_user->first_name ?: 'User';
+                $identify['lastName']  = $current_user->last_name ?: '';
+                if ( function_exists( 'get_avatar_url' ) ) {
+                    $identify['avatar'] = get_avatar_url( $current_user->ID );
+                }
+            }
+        }
+
+        return $identify;
+    }
 }
