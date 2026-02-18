@@ -267,6 +267,10 @@ class Client {
      * @return array Enriched properties.
      */
     private function prepare_properties( array $properties ): array {
+        // Capture user environment at the moment of tracking (crucial for OS/Country)
+        $properties['ip_address']     = $properties['ip_address'] ?? Utils::get_ip_address();
+        $properties['user_agent']     = $properties['user_agent'] ?? Utils::get_user_agent();
+
         // Add metadata if not already present
         $properties['site_url']       = $properties['site_url'] ?? get_site_url();
         $properties['unique_id']      = $properties['unique_id'] ?? $this->config['unique_id'];
