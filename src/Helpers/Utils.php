@@ -100,25 +100,29 @@ class Utils {
      * Sanitize properties array recursively
      *
      * Preserves special OpenPanel properties like __identify that start with double underscore.
+     * Also preserves the case of keys inside the __identify block as OpenPanel is case-sensitive
+     * for those specific identification keys (profileId, firstName, etc).
      *
      * @param array $properties Properties array to sanitize
+     * @param bool  $is_identify Whether we are currently sanitizing the __identify block
      *
      * @return array Sanitized properties array
      * @since 1.0.0
      */
-    public static function sanitizeProperties( array $properties ): array {
+    public static function sanitizeProperties( array $properties, bool $is_identify = false ): array {
         $sanitized = array();
         
         foreach ( $properties as $key => $value ) {
             // Preserve special OpenPanel properties (starting with __)
-            if ( strpos( $key, '__' ) === 0 ) {
+            // or if we are already inside the __identify block (to maintain camelCase)
+            if ( $is_identify || strpos( $key, '__' ) === 0 ) {
                 $sanitized_key = $key;
             } else {
                 $sanitized_key = sanitize_key( $key );
             }
             
             if ( is_array( $value ) ) {
-                $sanitized[ $sanitized_key ] = self::sanitizeProperties( $value );
+                $sanitized[ $sanitized_key ] = self::sanitizeProperties( $value, $is_identify || $key === '__identify' );
             } elseif ( is_string( $value ) ) {
                 $sanitized[ $sanitized_key ] = sanitize_text_field( $value );
             } elseif ( is_numeric( $value ) ) {

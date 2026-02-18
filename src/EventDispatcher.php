@@ -122,10 +122,10 @@ class EventDispatcher {
 
 		// Add required fields with proper sanitization
 		$sanitized_properties['site_url']       = esc_url_raw( Utils::getSiteUrl() );
-		$sanitized_properties['unique_id']      = $this->unique_id;
+		$sanitized_properties['unique_id']      = $sanitized_properties['unique_id'] ?? $this->unique_id;
 		$sanitized_properties['plugin_name']    = $this->plugin_name;
 		$sanitized_properties['plugin_version'] = $this->plugin_version;
-		$sanitized_properties['timestamp']      = Utils::getCurrentTimestamp();
+		$sanitized_properties['timestamp']      = $sanitized_properties['timestamp'] ?? Utils::getCurrentTimestamp();
 
 		// Automatically add profile identification with current user info
 		if ( ! isset( $sanitized_properties['__identify'] ) ) {
