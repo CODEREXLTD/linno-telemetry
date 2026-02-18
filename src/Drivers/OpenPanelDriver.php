@@ -216,7 +216,7 @@ class OpenPanelDriver implements DriverInterface {
 				'name'       => $payload['event'],
 				'properties' => $this->arrayToObject( $payload['properties'] ),
 			),
-		) );
+		), JSON_UNESCAPED_SLASHES | JSON_UNESCAPED_UNICODE );
 
 		// Build headers for cURL
 		$headers = array();

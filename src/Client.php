@@ -221,10 +221,8 @@ class Client {
             return;
         }
 
-        // Add user identification context if not already present
-        if ( ! isset( $properties['__identify'] ) ) {
-            $properties['__identify'] = Utils::get_current_user_identify();
-        }
+        // Prepare full properties with metadata
+        $properties = $this->prepare_properties( $properties );
 
         $result = $this->handlers['dispatcher']->dispatch( $event, $properties );
 
@@ -255,13 +253,33 @@ class Client {
             return;
         }
 
+        // Prepare full properties with metadata
+        $properties = $this->prepare_properties( $properties );
+
+        // Add event to queue
+        $this->handlers['queue']->add( $this->config['slug'], $event, $properties );
+    }
+
+    /**
+     * Prepare event properties with all necessary metadata.
+     *
+     * @param array $properties Original properties.
+     * @return array Enriched properties.
+     */
+    private function prepare_properties( array $properties ): array {
+        // Add metadata if not already present
+        $properties['site_url']       = $properties['site_url'] ?? get_site_url();
+        $properties['unique_id']      = $properties['unique_id'] ?? $this->config['unique_id'];
+        $properties['plugin_name']    = $properties['plugin_name'] ?? $this->config['pluginName'];
+        $properties['plugin_version'] = $properties['plugin_version'] ?? $this->config['pluginVersion'];
+        $properties['timestamp']      = $properties['timestamp'] ?? Utils::getCurrentTimestamp();
+
         // Add user identification context if not already present
         if ( ! isset( $properties['__identify'] ) ) {
             $properties['__identify'] = Utils::get_current_user_identify();
         }
 
-        // Add event to queue
-        $this->handlers['queue']->add( $this->config['slug'], $event, $properties );
+        return $properties;
     }
 
     /**
