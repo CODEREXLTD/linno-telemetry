@@ -155,12 +155,16 @@ class Client {
     public function activate(): void {
         $this->create_queue_table();
         update_option( $this->config['slug'] . '_telemetry_table_created', 'yes' );
-        update_option( $this->config['slug'] . '_telemetry_activation_pending', 'yes', false );
+        
+        // Only set pending if not already tracked
+        if ( ! get_option( $this->config['slug'] . '_telemetry_activated_tracked' ) ) {
+            update_option( $this->config['slug'] . '_telemetry_activation_pending', 'yes', false );
+        }
 
         // If the user is already opted-in, track the activation event immediately
         // as the consent modal won't be shown again.
-        if ( $this->isOptInEnabled() ) {
-            $this->track_immediate( 'plugin_activated', [ 'site_url' => get_site_url(), 'unique_id' => $this->config['unique_id'] ] );
+        if ( $this->isOptInEnabled() && ! get_option( $this->config['slug'] . '_telemetry_activated_tracked' ) ) {
+            $this->track_immediate( 'plugin_activated', [ 'site_url' => get_site_url(), 'unique_id' => $this->config['unique_id'] ], true );
             update_option( $this->config['slug'] . '_telemetry_activated_tracked', 'yes' );
             delete_option( $this->config['slug'] . '_telemetry_activation_pending' );
         }

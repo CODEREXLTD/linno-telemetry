@@ -54,19 +54,9 @@ class Consent {
             update_option( $this->client->get_optin_key(), 'yes' );
             $this->dismiss_notice();
 
-            // Ensure the queue table exists when user opts in
-            $this->client->create_queue_table();
-
-            // If a plugin activation was pending due to lack of consent, track it now
-            // or if it's the first time opting in, track it as an activation.
-            $activation_pending = get_option( $this->client->get_slug() . '_telemetry_activation_pending' );
-            if ( 'yes' === $activation_pending || ! get_option( $this->client->get_slug() . '_telemetry_activated_tracked' ) ) {
-                $this->client->track_immediate( 'plugin_activated', [ 'site_url' => get_site_url(), 'unique_id' => $this->client->get_unique_id() ], true );
-                update_option( $this->client->get_slug() . '_telemetry_activated_tracked', 'yes' );
-                if ( 'yes' === $activation_pending ) {
-                    delete_option( $this->client->get_slug() . '_telemetry_activation_pending' );
-                }
-            }
+            // Explicitly call activate() to ensure table is created and flags are set.
+            // Since we just set optin to 'yes', activate() will now track the 'plugin_activated' event.
+            $this->client->activate();
         }
 
         if ( $_GET['action'] === 'optout' ) {
