@@ -46,87 +46,69 @@ use CodeRex\Telemetry\Client;
  */
 $test_telemetry_client = null;
 
-/**
- * Initialize the Telemetry SDK
- *
- * @since 1.0.0
- */
-function test_telemetry_init() {
-    global $test_telemetry_client;
+// Replace with your actual OpenPanel API key and secret
+$api_key = 'op_4d049e93ece5870c534a';
+$api_secret = 'sec_4d049e93ece5870c534a';
+$text_domain = 'test-telemetry-plugin';
 
-    // Replace with your actual OpenPanel API key and secret
-    $api_key = 'op_4d049e93ece5870c534a';
-    $api_secret = 'sec_4d049e93ece5870c534a';
-    $text_domain = 'test-telemetry-plugin';
+try {
+    // Optional: Set text domain for i18n (defaults to plugin slug if not set)
+    Client::set_text_domain( $text_domain );
+
+    // Initialize the telemetry client (only 4 arguments now)
+    $test_telemetry_client = new Client(
+        $api_key,
+        $api_secret,
+        'Test Telemetry Plugin',
+        __FILE__
+    );
     
-    try {
-        // Initialize the telemetry client
-        $test_telemetry_client = new Client(
-            $api_key,
-            $api_secret,
-            'Test Telemetry Plugin',
-            __FILE__,
-            $text_domain
-        );
+    // Define automatic triggers for PLG events
+    // This is the new unified way - developers just define WHEN to track
+    $test_telemetry_client->define_triggers([
+        // Setup: Fire when user completes setup wizard
+        // Developer fires: do_action('my_plugin_setup_complete')
+        'setup' => 'my_plugin_setup_complete',
         
-        // Define automatic triggers for PLG events
-        // This is the new unified way - developers just define WHEN to track
-        $test_telemetry_client->define_triggers([
-            // Setup: Fire when user completes setup wizard
-            // Developer fires: do_action('my_plugin_setup_complete')
-            'setup' => 'my_plugin_setup_complete',
-            
-            // First Strike: Fire when user experiences core value for first time
-            // Developer fires: do_action('my_plugin_first_funnel_created')
-            'first_strike' => 'my_plugin_first_funnel_created',
-            
-            // KUI (Key Usage Indicators): Fire when user gets sufficient value
-            // Supports threshold-based tracking (e.g., 2 orders per week)
-            'kui' => [
-                'order_received' => [
-                    'hook' => 'woocommerce_order_created',
-                    'threshold' => ['count' => 2, 'period' => 'week'],
-                    'callback' => function( $order_id ) {
-                        return ['order_id' => $order_id];
-                    }
-                ],
-                'student_enrolled' => [
-                    'hook' => 'lms_student_enrolled',
-                    'threshold' => ['count' => 2, 'period' => 'week'],
-                    'callback' => function( $course_id, $student_id ) {
-                        return ['course_id' => $course_id, 'student_id' => $student_id];
-                    }
-                ],
-                // Simple KUI without threshold (fires every time)
-                'funnel_published' => [
-                    'hook' => 'my_plugin_funnel_published'
-                ]
+        // First Strike: Fire when user experiences core value for first time
+        // Developer fires: do_action('my_plugin_first_funnel_created')
+        'first_strike' => 'my_plugin_first_funnel_created',
+        
+        // KUI (Key Usage Indicators): Fire when user gets sufficient value
+        // Supports threshold-based tracking (e.g., 2 orders per week)
+        'kui' => [
+            'order_received' => [
+                'hook' => 'woocommerce_order_created',
+                'threshold' => ['count' => 2, 'period' => 'week'],
+                'callback' => function( $order_id ) {
+                    return ['order_id' => $order_id];
+                }
+            ],
+            'student_enrolled' => [
+                'hook' => 'lms_student_enrolled',
+                'threshold' => ['count' => 2, 'period' => 'week'],
+                'callback' => function( $course_id, $student_id ) {
+                    return ['course_id' => $course_id, 'student_id' => $student_id];
+                }
+            ],
+            // Simple KUI without threshold (fires every time)
+            'funnel_published' => [
+                'hook' => 'my_plugin_funnel_published'
             ]
-        ]);
-        
-        // Alternative: Fluent API for more control
-        // $test_telemetry_client->triggers()
-        //     ->on_setup('my_plugin_setup_complete')
-        //     ->on_first_strike('my_plugin_first_funnel_created')
-        //     ->on_kui('order_received', [
-        //         'hook' => 'woocommerce_order_created',
-        //         'threshold' => ['count' => 2, 'period' => 'week']
-        //     ])
-        //     ->on('custom_event', 'my_custom_hook', function( $data ) {
-        //         return ['custom_data' => $data];
-        //     });
-        
-        // Initialize all hooks for consent, deactivation, and triggers
-        $test_telemetry_client->init();
-        
-    } catch (Exception $e) {
-        error_log('Test Telemetry Plugin: Failed to initialize - ' . $e->getMessage());
-    }
+        ]
+    ]);
+    
+    // Initialize all hooks for consent, deactivation, and triggers
+    // This now internally registers activation and deactivation hooks
+    $test_telemetry_client->init();
+    
+} catch (Exception $e) {
+    error_log('Test Telemetry Plugin: Failed to initialize - ' . $e->getMessage());
 }
-add_action('plugins_loaded', 'test_telemetry_init');
 
 /**
  * Track a custom event when a post is published
+
  *
  * @param int $post_id Post ID
  * @since 1.0.0

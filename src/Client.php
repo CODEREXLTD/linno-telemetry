@@ -25,154 +25,78 @@ use InvalidArgumentException;
  */
 class Client {
     /**
-     * API key for OpenPanel
+     * Configuration data (apiKey, apiSecret, pluginName, pluginFile, slug, version, unique_id)
      *
-     * @var string
-     * @since 1.0.0
+     * @var array
      */
-    private string $apiKey;
-
-    /**
-     * API secret for OpenPanel
-     *
-     * @var string
-     * @since 1.0.0
-     */
-    private string $apiSecret;
-
-    /**
-     * Plugin name
-     *
-     * @var string
-     * @since 1.0.0
-     */
-    private string $pluginName;
-
-
-    /**
-     * Plugin slug
-     *
-     * @var string
-     * @since 1.0.0
-     */
-    private string $slug;
-
-    /**
-     * Plugin file path
-     *
-     * @var string
-     * @since 1.0.0
-     */
-    private string $pluginFile;
-
-    /**
-     * Plugin version
-     *
-     * @var string
-     * @since 1.0.0
-     */
-    private string $pluginVersion;
-
-    /**
-     * EventDispatcher instance
-     *
-     * @var EventDispatcher
-     * @since 1.0.0
-     */
-    private EventDispatcher $dispatcher;
-
-    /**
-     * Consent instance
-     *
-     * @var Consent
-     * @since 1.0.0
-     */
-    private Consent $consent;
-
-    /**
-     * Deactivation instance
-     *
-     * @var Deactivation
-     * @since 1.0.0
-     */
-    private Deactivation $deactivation;
-
-    /**
-     * Queue instance
-     *
-     * @var Queue
-     * @since 1.0.0
-     */
-    private Queue $queue;
-
-    /**
-     * TriggerManager instance
-     *
-     * @var TriggerManager
-     * @since 1.0.0
-     */
-    private ?TriggerManager $trigger_manager = null;
+    private array $config = [];
 
     /**
      * Text domain for i18n
      *
      * @var string
-     * @since 1.0.0
      */
-    private string $textDomain;
+    private static string $textDomain = '';
 
     /**
-     * Unique identifier for the site
+     * Handlers (dispatcher, consent, deactivation, queue)
      *
-     * @var string
-     * @since 1.0.0
+     * @var array
      */
-    private string $unique_id;
+    private array $handlers = [];
 
-
+    /**
+     * TriggerManager instance
+     *
+     * @var TriggerManager|null
+     */
+    private ?TriggerManager $trigger_manager = null;
 
     /**
      * Constructor
      *
      * Initializes the telemetry client with API key, plugin name, and plugin file path.
-     * Validates the API key and extracts plugin version from the plugin file.
      *
      * @param string $apiKey API key for OpenPanel authentication.
      * @param string $apiSecret API secret for OpenPanel authentication.
      * @param string $pluginName Human-readable plugin name.
      * @param string $pluginFile Path to the main plugin file.
-     * @param string $textDomain Text domain for internationalization.
      *
      * @throws InvalidArgumentException If API key is empty.
      * @since 1.0.0
      */
-    public function __construct( string $apiKey, string $apiSecret, string $pluginName, string $pluginFile, string $textDomain ) {
+    public function __construct( string $apiKey, string $apiSecret, string $pluginName, string $pluginFile ) {
         // Validate API key
         if ( empty( $apiKey ) ) {
             throw new InvalidArgumentException( 'API key cannot be empty' );
         }
 
-        $this->apiKey       = $apiKey;
-        $this->apiSecret    = $apiSecret;
-        $this->pluginName   = $pluginName;
-        $this->pluginFile   = $pluginFile;
-        $this->pluginVersion= Utils::getPluginVersion( $pluginFile );
-        $this->textDomain   = $textDomain;
+        $this->config['apiKey']        = $apiKey;
+        $this->config['apiSecret']     = $apiSecret;
+        $this->config['pluginName']    = $pluginName;
+        $this->config['pluginFile']    = $pluginFile;
+        $this->config['pluginVersion'] = Utils::getPluginVersion( $pluginFile );
+        
         $this->set_slug();
-        $this->unique_id    = $this->get_or_create_unique_id(); // Initialize unique ID
+        $this->config['unique_id']     = $this->get_or_create_unique_id();
 
-        // Initialize OpenPanelDriver with API key
+        // Default text domain if not already set
+        if ( empty( self::$textDomain ) ) {
+            self::$textDomain = $this->config['slug'];
+        }
+
+        // Initialize OpenPanelDriver
         $driver = new OpenPanelDriver();
         $driver->setApiKey( $apiKey );
         $driver->setApiSecret( $apiSecret );
 
         // Initialize EventDispatcher
-        $this->dispatcher = new EventDispatcher( $driver, $pluginName, $this->pluginVersion );
+        $this->handlers['dispatcher'] = new EventDispatcher( $driver, $pluginName, $this->config['pluginVersion'] );
 
-        // Initialize handlers
-        $this->consent = new Consent( $this );
-        $this->deactivation = new Deactivation( $this );
-        $this->queue = new Queue();
+        // Initialize other handlers
+        $this->handlers['consent'] = new Consent( $this );
+        $this->handlers['deactivation'] = new Deactivation( $this );
+        $this->handlers['queue'] = new Queue();
 
         // Schedule background reporting
         $this->scheduleBackgroundReporting();
@@ -184,7 +108,16 @@ class Client {
      * @return string
      */
     public function get_text_domain(): string {
-        return $this->textDomain;
+        return self::$textDomain;
+    }
+
+    /**
+     * Set the text domain.
+     *
+     * @param string $textDomain
+     */
+    public static function set_text_domain( string $textDomain ): void {
+        self::$textDomain = $textDomain;
     }
 
     /**
@@ -195,10 +128,23 @@ class Client {
      * @return void
      */
     public function init(): void {
-        load_plugin_textdomain( $this->textDomain, false, dirname( plugin_basename( $this->pluginFile ) ) . '/languages' );
-        $this->consent->init();
-        $this->deactivation->init();
+        if ( ! empty( self::$textDomain ) ) {
+            load_plugin_textdomain( self::$textDomain, false, dirname( plugin_basename( $this->config['pluginFile'] ) ) . '/languages' );
+        }
+        
+        $this->handlers['consent']->init();
+        $this->handlers['deactivation']->init();
         $this->init_triggers();
+
+        // Internally register activation and deactivation hooks
+        register_activation_hook( $this->config['pluginFile'], [ $this, 'activate' ] );
+        register_deactivation_hook( $this->config['pluginFile'], [ $this, 'deactivate' ] );
+
+        // Ensure table is created if it was missed by the activation hook
+        if ( ! get_option( $this->config['slug'] . '_telemetry_table_created' ) ) {
+            $this->create_queue_table();
+            update_option( $this->config['slug'] . '_telemetry_table_created', 'yes' );
+        }
     }
 
     /**
@@ -207,15 +153,27 @@ class Client {
      * @return void
      */
     public function activate(): void {
-        $this->queue->create_table();
-        update_option( $this->slug . '_telemetry_activation_pending', 'yes', false );
+        $this->create_queue_table();
+        update_option( $this->config['slug'] . '_telemetry_table_created', 'yes' );
+        update_option( $this->config['slug'] . '_telemetry_activation_pending', 'yes', false );
 
         // If the user is already opted-in, track the activation event immediately
         // as the consent modal won't be shown again.
         if ( $this->isOptInEnabled() ) {
-            $this->track_immediate( 'plugin_activated', [ 'site_url' => get_site_url(), 'unique_id' => $this->unique_id ] );
-            delete_option( $this->slug . '_telemetry_activation_pending' );
+            $this->track_immediate( 'plugin_activated', [ 'site_url' => get_site_url(), 'unique_id' => $this->config['unique_id'] ] );
+            update_option( $this->config['slug'] . '_telemetry_activated_tracked', 'yes' );
+            delete_option( $this->config['slug'] . '_telemetry_activation_pending' );
         }
+    }
+
+    /**
+     * Create the queue table.
+     *
+     * @return void
+     * @since 1.0.1
+     */
+    public function create_queue_table(): void {
+        $this->handlers['queue']->create_table();
     }
 
     /**
@@ -232,12 +190,12 @@ class Client {
         $transient_key = $this->get_slug() . '_deactivation_event_sent';
         if ( 'yes' !== get_transient( $transient_key ) ) {
             // Send a generic deactivation event if the feedback form didn't send one
-            $this->track_immediate( 'plugin_deactivated', [ 'site_url' => get_site_url(), 'unique_id' => $this->unique_id, 'feedback_provided' => false ] );
+            $this->track_immediate( 'plugin_deactivated', [ 'site_url' => get_site_url(), 'unique_id' => $this->config['unique_id'], 'feedback_provided' => false ] );
         }
         // Clean up the transient regardless
         delete_transient( $transient_key );
 
-        $this->queue->clear_for_plugin( $this->slug );
+        $this->handlers['queue']->clear_for_plugin( $this->config['slug'] );
     }
 
 
@@ -259,10 +217,10 @@ class Client {
             return;
         }
 
-        $result = $this->dispatcher->dispatch( $event, $properties );
+        $result = $this->handlers['dispatcher']->dispatch( $event, $properties );
 
         if ( $result ) {
-            update_option( $this->slug . '_telemetry_last_send', time(), false );
+            update_option( $this->config['slug'] . '_telemetry_last_send', time(), false );
         }
     }
 
@@ -285,7 +243,7 @@ class Client {
         }
 
         // Add event to queue
-        $this->queue->add( $this->slug, $event, $properties );
+        $this->handlers['queue']->add( $this->config['slug'], $event, $properties );
     }
 
     /**
@@ -307,7 +265,7 @@ class Client {
      * @return string
      */
     public function get_optin_key(): string {
-        return $this->slug . '_allow_tracking';
+        return $this->config['slug'] . '_allow_tracking';
     }
 
     /**
@@ -316,7 +274,7 @@ class Client {
      * @return string
      */
     public function get_slug(): string {
-        return $this->slug;
+        return $this->config['slug'];
     }
 
     /**
@@ -325,7 +283,7 @@ class Client {
      * @return string
      */
     public function get_plugin_file(): string {
-        return $this->pluginFile;
+        return $this->config['pluginFile'];
     }
 
     /**
@@ -334,7 +292,7 @@ class Client {
      * @return string
      */
     public function get_plugin_name(): string {
-        return $this->pluginName;
+        return $this->config['pluginName'];
     }
 
     /**
@@ -343,7 +301,7 @@ class Client {
      * @return string
      */
     public function get_unique_id(): string {
-        return $this->unique_id;
+        return $this->config['unique_id'];
     }
 
     /**
@@ -488,7 +446,7 @@ class Client {
      * @since 1.0.0
      */
     public function has_sent_event( string $event_name ): bool {
-        return 'yes' === get_option( $this->slug . '_event_sent_' . $event_name, 'no' );
+        return 'yes' === get_option( $this->config['slug'] . '_event_sent_' . $event_name, 'no' );
     }
 
     /**
@@ -499,7 +457,7 @@ class Client {
      * @since 1.0.0
      */
     public function mark_event_sent( string $event_name ): void {
-        update_option( $this->slug . '_event_sent_' . $event_name, 'yes' );
+        update_option( $this->config['slug'] . '_event_sent_' . $event_name, 'yes' );
     }
 
     /**
@@ -520,7 +478,7 @@ class Client {
         // Schedule cron job if not already scheduled
         if ( ! wp_next_scheduled( $hook ) ) {
             // Apply filter for customizable interval (default: daily)
-            $interval = apply_filters( $this->slug . '_telemetry_report_interval', 'daily' );
+            $interval = apply_filters( $this->config['slug'] . '_telemetry_report_interval', 'daily' );
 
             // Schedule the event
             wp_schedule_event( time(), $interval, $hook );
@@ -550,7 +508,7 @@ class Client {
      * @return string
      */
     public function get_cron_hook(): string {
-        return $this->slug . '_telemetry_queue_process';
+        return $this->config['slug'] . '_telemetry_queue_process';
     }
 
     /**
@@ -562,7 +520,7 @@ class Client {
      * @since 1.0.0
      */
     public function process_queue(): void {
-        $events = $this->queue->get_all( $this->slug );
+        $events = $this->handlers['queue']->get_all( $this->config['slug'] );
 
         if ( empty( $events ) ) {
             return;
@@ -572,16 +530,16 @@ class Client {
 
         foreach ( $events as $event ) {
             $properties = json_decode( $event->properties, true );
-            $result = $this->dispatcher->dispatch( $event->event, $properties );
+            $result = $this->handlers['dispatcher']->dispatch( $event->event, $properties );
 
             if ( $result ) {
                 $ids_to_delete[] = $event->id;
-                update_option( $this->slug . '_telemetry_last_send', time(), false );
+                update_option( $this->config['slug'] . '_telemetry_last_send', time(), false );
             }
         }
 
         if ( ! empty( $ids_to_delete ) ) {
-            $this->queue->delete( $ids_to_delete );
+            $this->handlers['queue']->delete( $ids_to_delete );
         }
     }
 
@@ -592,7 +550,7 @@ class Client {
      * @return void
      */
     private function set_slug() {
-        $this->slug = dirname( plugin_basename( $this->pluginFile ) );
+        $this->config['slug'] = dirname( plugin_basename( $this->config['pluginFile'] ) );
     }
 
     /**
@@ -601,7 +559,7 @@ class Client {
      * @return string
      */
     private function get_or_create_unique_id(): string {
-        $option_name = $this->slug . '_telemetry_unique_id';
+        $option_name = $this->config['slug'] . '_telemetry_unique_id';
         $unique_id = get_option( $option_name );
 
         if ( empty( $unique_id ) ) {

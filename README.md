@@ -90,13 +90,15 @@ require_once __DIR__ . '/vendor/autoload.php';
 
 use CodeRex\Telemetry\Client;
 
-// Initialize the telemetry client
+// Optional: Set text domain for i18n (defaults to plugin slug)
+Client::set_text_domain( 'my-awesome-plugin' );
+
+// Initialize the telemetry client with only 4 arguments
 $telemetry_client = new Client(
     'your-openpanel-client-id-here',    // Your OpenPanel API Key
     'your-openpanel-secret-key-here',   // Your OpenPanel API Secret
     'My Awesome Plugin',                // Human-readable plugin name
-    __FILE__,                           // Path to the main plugin file
-    'my-awesome-plugin'                 // Text domain for i18n
+    __FILE__                            // Path to the main plugin file
 );
 
 // Define automatic triggers for PLG events (recommended)
@@ -127,12 +129,11 @@ $telemetry_client->define_triggers([
     ]
 ]);
 
-// IMPORTANT: Register activation hook
-// This is necessary to create the database table and track the activation event.
-register_activation_hook(__FILE__, [$telemetry_client, 'activate']);
-
-// Initialize all other hooks for consent, deactivation, and triggers
+// Initialize all hooks for consent, deactivation, and triggers
+// IMPORTANT: This now INTERNALLY registers activation and deactivation hooks.
+// You no longer need to call register_activation_hook manually.
 $telemetry_client->init();
+
 
 // Note on deactivation:
 // The deactivation feedback modal is handled automatically by the library.
@@ -142,11 +143,11 @@ $telemetry_client->init();
 
 ### What Happens Next?
 
-1.  **Plugin Activation**: When you activate the plugin, the `register_activation_hook` will trigger the `activate` method in the SDK. This tracks the `plugin_activated` event (no consent needed) and creates a database table for the event queue.
+1.  **Plugin Activation**: When the plugin is activated, the SDK (which internally registered the activation hook during `$telemetry_client->init()`) triggers the `activate` method. This tracks the `plugin_activated` event and ensures the database table is created.
 2.  **User Consent Notice**: For new installations, an admin notice will ask the user for consent to track usage data.
 3.  **User Choice**: If the user allows, PLG events (setup, first strike, KUI) and custom events will be tracked automatically based on your trigger configuration. If not, only non-consent events are tracked.
-4.  **Deactivation Feedback**: Upon deactivation, a modal will prompt the user for a reason, which is tracked (no consent needed). This is handled automatically by the library when you call `$telemetry_client->init()`.
-5.  **Asynchronous Sending**: All events (requiring consent or not) are added to a local queue and sent to OpenPanel in batches via a daily WP-Cron job.
+4.  **Deactivation Feedback**: Upon deactivation, a modal will prompt the user for a reason, which is tracked. This is handled automatically by the library's internal deactivation hook.
+5.  **Asynchronous Sending**: All events are added to a local queue and sent to OpenPanel in batches via a daily WP-Cron job.
 
 ## Trigger System
 
