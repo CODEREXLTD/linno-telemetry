@@ -156,6 +156,7 @@ class OpenPanelDriver implements DriverInterface {
 
 		if ( is_wp_error( $response ) ) {
 			$this->lastError = $response->get_error_message();
+            error_log( 'CodeRex Telemetry (OpenPanelDriver): WP_Error - ' . $this->lastError );
 			return false;
 		}
 
@@ -167,6 +168,7 @@ class OpenPanelDriver implements DriverInterface {
 				$httpCode,
 				wp_remote_retrieve_response_message( $response )
 			);
+            error_log( 'CodeRex Telemetry (OpenPanelDriver): ' . $this->lastError );
 			return false;
 		}
 

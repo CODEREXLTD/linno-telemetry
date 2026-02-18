@@ -221,6 +221,10 @@ class Client {
 
         if ( $result ) {
             update_option( $this->config['slug'] . '_telemetry_last_send', time(), false );
+        } else {
+            error_log( 'CodeRex Telemetry: Failed to send immediate event: ' . $event );
+            // Fallback: Add to queue if immediate send fails
+            $this->handlers['queue']->add( $this->config['slug'], $event, $properties );
         }
     }
 

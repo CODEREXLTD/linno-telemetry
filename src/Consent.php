@@ -61,7 +61,7 @@ class Consent {
             // or if it's the first time opting in, track it as an activation.
             $activation_pending = get_option( $this->client->get_slug() . '_telemetry_activation_pending' );
             if ( 'yes' === $activation_pending || ! get_option( $this->client->get_slug() . '_telemetry_activated_tracked' ) ) {
-                $this->client->track_immediate( 'plugin_activated', [ 'site_url' => get_site_url(), 'unique_id' => $this->client->get_unique_id() ] );
+                $this->client->track_immediate( 'plugin_activated', [ 'site_url' => get_site_url(), 'unique_id' => $this->client->get_unique_id() ], true );
                 update_option( $this->client->get_slug() . '_telemetry_activated_tracked', 'yes' );
                 if ( 'yes' === $activation_pending ) {
                     delete_option( $this->client->get_slug() . '_telemetry_activation_pending' );
