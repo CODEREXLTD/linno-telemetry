@@ -175,31 +175,6 @@ class OpenPanelDriver implements DriverInterface {
 	}
 
 	/**
-	 * Convert array to stdClass recursively
-	 *
-	 * OpenPanel requires properties to be an object, not an array.
-	 * This method converts associative arrays to stdClass objects recursively.
-	 *
-	 * @param mixed $data The data to convert.
-	 *
-	 * @return mixed Converted data with arrays as objects.
-	 * @since 1.0.0
-	 */
-	private function arrayToObject( $data ) {
-		if ( is_array( $data ) ) {
-			// Check if it's an associative array or indexed array
-			if ( empty( $data ) || array_keys( $data ) === range( 0, count( $data ) - 1 ) ) {
-				// Indexed array - keep as array but convert nested values
-				return array_map( array( $this, 'arrayToObject' ), $data );
-			} else {
-				// Associative array - convert to object
-				return (object) array_map( array( $this, 'arrayToObject' ), $data );
-			}
-		}
-		return $data;
-	}
-
-	/**
 	 * Make HTTPS request to OpenPanel API using cURL
 	 *
 	 * @param array $payload The payload to send.
@@ -210,13 +185,18 @@ class OpenPanelDriver implements DriverInterface {
 	private function makeRequest( array $payload ): bool {
 		
 		$ch = curl_init( self::API_ENDPOINT );
-		$body = wp_json_encode( array(
+		$body = json_encode( array(
 			'type'    => 'track',
 			'payload' => array(
 				'name'       => $payload['event'],
-				'properties' => $this->arrayToObject( $payload['properties'] ),
+				'properties' => $payload['properties'],
 			),
 		), JSON_UNESCAPED_SLASHES | JSON_UNESCAPED_UNICODE );
+
+		// Log outgoing payload and response if debugging is on
+		if ( defined( 'WP_DEBUG' ) && WP_DEBUG ) {
+			error_log( 'CodeRex Telemetry (Outgoing): ' . $body );
+		}
 
 		// Build headers for cURL
 		$headers = array();
@@ -244,6 +224,11 @@ class OpenPanelDriver implements DriverInterface {
 		$errno    = curl_errno( $ch );
 
 		curl_close( $ch );
+
+		if ( defined( 'WP_DEBUG' ) && WP_DEBUG ) {
+			error_log( 'CodeRex Telemetry (Response): ' . $response );
+		}
+
 		return $this->handleResponse( $response, $httpCode, $error, $errno );
 	}
 
