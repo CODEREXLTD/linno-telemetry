@@ -219,33 +219,6 @@ class Utils {
     }
 
     /**
-     * Get the current user's IP address.
-     *
-     * @return string IP address.
-     * @since 1.0.1
-     */
-    public static function get_ip_address(): string {
-        $ip_keys = [ 'HTTP_CF_CONNECTING_IP', 'HTTP_X_FORWARDED_FOR', 'HTTP_X_REAL_IP', 'REMOTE_ADDR' ];
-        foreach ( $ip_keys as $key ) {
-            if ( ! empty( $_SERVER[ $key ] ) ) {
-                $ip = explode( ',', $_SERVER[ $key ] )[0];
-                return filter_var( trim( $ip ), FILTER_VALIDATE_IP ) ?: '127.0.0.1';
-            }
-        }
-        return '127.0.0.1';
-    }
-
-    /**
-     * Get the current user's User Agent.
-     *
-     * @return string User Agent string.
-     * @since 1.0.1
-     */
-    public static function get_user_agent(): string {
-        return isset( $_SERVER['HTTP_USER_AGENT'] ) ? sanitize_text_field( $_SERVER['HTTP_USER_AGENT'] ) : '';
-    }
-
-    /**
      * Get the current user's identification data for telemetry.
      *
      * @return array Identification data with profileId and user info.

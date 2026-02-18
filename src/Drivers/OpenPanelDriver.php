@@ -119,7 +119,6 @@ class OpenPanelDriver implements DriverInterface {
 	 * @since 1.0.0
 	 */
 	private function makeRequest( array $payload ): bool {
-		
 		$ch = curl_init( self::API_ENDPOINT );
 		$body = json_encode( array(
 			'type'    => 'track',
@@ -128,11 +127,6 @@ class OpenPanelDriver implements DriverInterface {
 				'properties' => $payload['properties'],
 			),
 		), JSON_UNESCAPED_SLASHES | JSON_UNESCAPED_UNICODE );
-
-		// Log outgoing payload and response if debugging is on
-		if ( defined( 'WP_DEBUG' ) && WP_DEBUG ) {
-			error_log( 'CodeRex Telemetry (Outgoing): ' . $body );
-		}
 
 		// Build headers for cURL
 		$headers = array();
@@ -161,10 +155,6 @@ class OpenPanelDriver implements DriverInterface {
 		$errno    = curl_errno( $ch );
 
 		curl_close( $ch );
-
-		if ( defined( 'WP_DEBUG' ) && WP_DEBUG ) {
-			error_log( 'CodeRex Telemetry (Response): ' . $response );
-		}
 
 		return $this->handleResponse( $response, $httpCode, $error, $errno );
 	}

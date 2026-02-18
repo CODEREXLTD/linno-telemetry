@@ -205,13 +205,11 @@ class EventDispatcher {
 	private function validatePayload( array $payload ): bool {
 		// Check event key exists and is not empty
 		if ( empty( $payload['event'] ) || ! is_string( $payload['event'] ) ) {
-            error_log( 'CodeRex Telemetry: Payload validation failed - invalid event name' );
 			return false;
 		}
 
 		// Check properties key exists and is an array
 		if ( ! isset( $payload['properties'] ) || ! is_array( $payload['properties'] ) ) {
-            error_log( 'CodeRex Telemetry: Payload validation failed - invalid properties' );
 			return false;
 		}
 
@@ -222,7 +220,6 @@ class EventDispatcher {
 
 		foreach ( $required_fields as $field ) {
 			if ( empty( $properties[ $field ] ) || ! is_string( $properties[ $field ] ) ) {
-                error_log( 'CodeRex Telemetry: Payload validation failed - missing field: ' . $field );
 				return false;
 			}
 		}
