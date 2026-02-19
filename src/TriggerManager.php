@@ -259,19 +259,38 @@ class TriggerManager {
     private function handle_kui( string $key, array $trigger, array $args ): void {
         $name = $trigger['name'];
 
-        if ( ! empty( $trigger['threshold'] ) ) {
-            $period = $this->get_period_from_threshold( $trigger['threshold'] );
-            $this->increment_kui_counter( $name, $period );
-            $properties = $this->execute_callback( $trigger['callback'], $args );
+        // If threshold count is defined, track progress
+        if ( ! empty( $trigger['threshold']['count'] ) ) {
+            $this->increment_kui_counter( $name );
 
+            // If current count is >= threshold, send the event
             if ( $this->should_fire_kui( $name, $trigger['threshold'] ) ) {
+                $properties = $this->execute_callback( $trigger['callback'], $args );
                 $this->client->track_kui( $name, $properties ?: [] );
-                $this->reset_kui_counter( $name );
             }
         } else {
+            // No threshold count defined - fire on every hit
             $properties = $this->execute_callback( $trigger['callback'], $args );
             $this->client->track_kui( $name, $properties ?: [] );
         }
+    }
+
+    /**
+     * Mark a KUI as fired for a specific period
+     *
+     * @param string $name KUI name
+     * @param string $period_key The period key (e.g., YYYY-WW)
+     * @return void
+     */
+    private function mark_kui_fired( string $name, string $period_key ): void {
+        $counters = $this->get_kui_counters();
+        
+        if ( ! isset( $counters[ $name ] ) ) {
+            $counters[ $name ] = [];
+        }
+        
+        $counters[ $name ]['last_fired_period'] = $period_key;
+        $this->save_kui_counters( $counters );
     }
 
     /**
@@ -337,57 +356,31 @@ class TriggerManager {
      * Increment KUI counter
      *
      * @param string $name KUI name
-     * @param string|null $period Period type (day, week, month)
      * @return void
      */
-    private function increment_kui_counter( string $name, ?string $period = null ): void {
+    private function increment_kui_counter( string $name ): void {
         $counters = $this->get_kui_counters();
         
-        if ( $period === null ) {
-            $period = $counters[ $name ]['period'] ?? 'week';
-        }
-        
-        $period_key = $this->get_period_key_for_period( $period );
-
         if ( ! isset( $counters[ $name ] ) ) {
             $counters[ $name ] = [
                 'count'      => 0,
-                'period'     => $period,
-                'period_key' => $period_key,
                 'start_time' => time(),
             ];
         }
 
-        if ( $counters[ $name ]['period_key'] !== $period_key ) {
-            $counters[ $name ] = [
-                'count'      => 1,
-                'period'     => $period,
-                'period_key' => $period_key,
-                'start_time' => time(),
-            ];
-        } else {
-            $counters[ $name ]['count']++;
-        }
-
+        $counters[ $name ]['count']++;
         $this->save_kui_counters( $counters );
     }
 
     /**
-     * Get period key for a specific period type
+     * Reset all KUI counters for this plugin.
      *
-     * @param string $period Period type (day, week, month)
-     * @return string
+     * Called after successful telemetry reporting.
+     *
+     * @return void
      */
-    private function get_period_key_for_period( string $period ): string {
-        switch ( $period ) {
-            case 'day':
-                return date( 'Y-m-d' );
-            case 'month':
-                return date( 'Y-m' );
-            case 'week':
-            default:
-                return date( 'Y-W' );
-        }
+    public function reset_all_counters(): void {
+        update_option( $this->kui_counter_key, [] );
     }
 
     /**

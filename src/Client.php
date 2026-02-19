@@ -575,6 +575,11 @@ class Client {
 
         if ( ! empty( $ids_to_delete ) ) {
             $this->handlers['queue']->delete( $ids_to_delete );
+            
+            // Reset KUI counters after successful reporting
+            if ( null !== $this->trigger_manager ) {
+                $this->trigger_manager->reset_all_counters();
+            }
         }
     }
 
