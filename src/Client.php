@@ -737,6 +737,14 @@ class Client {
      * @since 1.0.0
      */
     public function process_queue(): void {
+        if ( ! $this->isOptInEnabled() ) {
+            return;
+        }
+
+        if ( ! $this->handlers['queue']->table_exists() ) {
+            return;
+        }
+
         $events = $this->handlers['queue']->get_all( $this->config['slug'] );
 
         if ( empty( $events ) ) {

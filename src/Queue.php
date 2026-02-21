@@ -18,6 +18,19 @@ class Queue {
     }
 
     /**
+     * Check whether the queue table exists.
+     *
+     * @return bool
+     */
+    public function table_exists(): bool {
+        global $wpdb;
+
+        $table = $wpdb->get_var( $wpdb->prepare( 'SHOW TABLES LIKE %s', $this->table_name ) );
+
+        return $table === $this->table_name;
+    }
+
+    /**
      * Create the custom table
      *
      * @return void
@@ -50,6 +63,10 @@ class Queue {
     public function add( string $plugin_slug, string $event, array $properties ): void {
         global $wpdb;
 
+        if ( ! $this->table_exists() ) {
+            $this->create_table();
+        }
+
         $wpdb->insert(
             $this->table_name,
             [
@@ -68,6 +85,10 @@ class Queue {
      */
     public function get_all( string $plugin_slug ): array {
         global $wpdb;
+
+        if ( ! $this->table_exists() ) {
+            return [];
+        }
 
         $results = $wpdb->get_results(
             $wpdb->prepare(
@@ -88,6 +109,10 @@ class Queue {
     public function delete( array $ids ): void {
         global $wpdb;
 
+        if ( ! $this->table_exists() || empty( $ids ) ) {
+            return;
+        }
+
         $ids = implode( ',', array_map( 'absint', $ids ) );
 
         $wpdb->query( "DELETE FROM {$this->table_name} WHERE id IN ($ids)" );
@@ -101,6 +126,10 @@ class Queue {
      */
     public function clear_for_plugin( string $plugin_slug ): void {
         global $wpdb;
+
+        if ( ! $this->table_exists() ) {
+            return;
+        }
 
         $wpdb->query(
             $wpdb->prepare(
