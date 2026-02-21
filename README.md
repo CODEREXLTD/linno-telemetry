@@ -42,7 +42,7 @@ Add the VCS repository to your `composer.json`:
 "repositories": [
   {
     "type": "vcs",
-    "url": "https://github.com/LINNO/linno-telemetry"
+    "url": "git@github.com:CODEREXLTD/linno-telemetry.git"
   }
 ]
 ```
