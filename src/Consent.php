@@ -101,14 +101,19 @@ class Consent {
                 <?php
                 $privacy_policy_url = apply_filters(
                     $this->client->get_slug() . '_telemetry_privacy_policy_url',
-                    'https://linno.co/privacy-policy/'
+                    $this->client->get_privacy_url()
+                );
+                $consent_service_name = apply_filters(
+                    $this->client->get_slug() . '_telemetry_consent_service_name',
+                    $this->client->get_consent_service_name()
                 );
                 $message = apply_filters(
                     $this->client->get_slug() . '_telemetry_consent_message',
                     sprintf(
-                        __( 'Help us improve %1$s. With your permission, this plugin sends usage and technical data to OpenPanel, including: site URL, plugin name and version, event timestamps, anonymous site profile ID, custom event properties, and your current admin profile details (email, first name, last name, and avatar) for identification and product support. Tracking is off by default. <a href="%2$s" target="_blank" rel="noopener noreferrer">Learn more</a>.', $this->textDomain ),
+                        __( 'Help us improve %1$s. With your permission, this plugin sends usage and technical data to %3$s, including: site URL, plugin name and version, event timestamps, anonymous site profile ID, custom event properties, and your current admin profile details (email, first name, last name, and avatar) for identification and product support. Tracking is off by default. <a href="%2$s" target="_blank" rel="noopener noreferrer">Learn more</a>.', $this->textDomain ),
                         '<strong>' . $plugin_name . '</strong>',
-                        esc_url( $privacy_policy_url )
+                        esc_url( $privacy_policy_url ),
+                        esc_html( $consent_service_name )
                     )
                 );
                 

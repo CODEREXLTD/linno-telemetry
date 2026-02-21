@@ -71,6 +71,20 @@ class Client {
     private static string $textDomain = '';
 
     /**
+     * Privacy policy URL for consent notice Learn more link.
+     *
+     * @var string
+     */
+    private static string $privacyUrl = 'https://rextheme.com/privacy-policy/';
+
+    /**
+     * Analytics service label used in consent notice message.
+     *
+     * @var string
+     */
+    private static string $consentServiceName = 'our analytics service';
+
+    /**
      * Handlers (dispatcher, consent, deactivation, queue)
      *
      * @var array
@@ -150,6 +164,48 @@ class Client {
      */
     public static function set_text_domain( string $textDomain ): void {
         self::$textDomain = $textDomain;
+    }
+
+    /**
+     * Get the privacy policy URL used for Learn more link.
+     *
+     * @return string
+     */
+    public function get_privacy_url(): string {
+        return self::$privacyUrl;
+    }
+
+    /**
+     * Set the privacy policy URL used for Learn more link.
+     *
+     * @param string $privacyUrl
+     * @return void
+     */
+    public static function set_privacy_url( string $privacyUrl ): void {
+        if ( ! empty( $privacyUrl ) ) {
+            self::$privacyUrl = $privacyUrl;
+        }
+    }
+
+    /**
+     * Get the analytics service label used in consent message.
+     *
+     * @return string
+     */
+    public function get_consent_service_name(): string {
+        return self::$consentServiceName;
+    }
+
+    /**
+     * Set the analytics service label used in consent message.
+     *
+     * @param string $serviceName
+     * @return void
+     */
+    public static function set_consent_service_name( string $serviceName ): void {
+        if ( ! empty( $serviceName ) ) {
+            self::$consentServiceName = $serviceName;
+        }
     }
 
     /**

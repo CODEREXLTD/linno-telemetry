@@ -93,6 +93,12 @@ use Linno\Telemetry\Client;
 // Optional: Set text domain for i18n (defaults to plugin slug)
 Client::set_text_domain( 'my-awesome-plugin' );
 
+// Optional: Set privacy policy URL for "Learn more" (default: https://rextheme.com/privacy-policy/)
+Client::set_privacy_url( 'https://your-site.com/privacy-policy/' );
+
+// Optional: Set analytics service label shown in consent notice (default: "our analytics service")
+Client::set_consent_service_name( 'RexTheme Analytics' );
+
 // Initialize the telemetry client with only 4 arguments
 $telemetry_client = new Client(
     'your-openpanel-client-id-here',    // Your OpenPanel API Key
