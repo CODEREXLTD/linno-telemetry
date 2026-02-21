@@ -5,11 +5,11 @@
  * Provides utility functions for gathering system information,
  * sanitizing data, and other helper operations.
  *
- * @package CodeRex\Telemetry
+ * @package Linno\Telemetry
  * @since 1.0.0
  */
 
-namespace CodeRex\Telemetry\Helpers;
+namespace Linno\Telemetry\Helpers;
 
 /**
  * Utils class
@@ -173,7 +173,7 @@ class Utils {
      * @since 1.0.0
      */
     public static function getSiteProfileId(): string {
-        $option_name = 'coderex_telemetry_site_profile_id';
+        $option_name = 'linno_telemetry_site_profile_id';
         $profile_id = get_option( $option_name );
         
         if ( empty( $profile_id ) ) {

@@ -1,10 +1,10 @@
-# CodeRex Telemetry SDK
+# Linno Telemetry SDK
 
-Privacy-first telemetry SDK for Code Rex WordPress plugins.
+Privacy-first telemetry SDK for Linno WordPress plugins.
 
 ## Overview
 
-The CodeRex Telemetry SDK is a Composer package that provides privacy-first telemetry tracking for WordPress plugins. It enforces user consent, standardizes event payloads, and integrates directly with OpenPanel analytics platform.
+The Linno Telemetry SDK is a Composer package that provides privacy-first telemetry tracking for WordPress plugins. It enforces user consent, standardizes event payloads, and integrates directly with OpenPanel analytics platform.
 
 ## Compliance and Development Guidelines (MUST READ)
 
@@ -42,7 +42,7 @@ Add the VCS repository to your `composer.json`:
 "repositories": [
   {
     "type": "vcs",
-    "url": "https://github.com/CODEREXLTD/coderex-telemetry"
+    "url": "https://github.com/LINNO/linno-telemetry"
   }
 ]
 ```
@@ -52,7 +52,7 @@ Add the VCS repository to your `composer.json`:
 In your WordPress plugin directory, run:
 
 ```bash
-composer require coderexltd/telemetry:dev-master
+composer require linno/telemetry:dev-master
 ```
 
 ### Step 3: Require Autoloader
@@ -88,7 +88,7 @@ if (!defined('ABSPATH')) {
 // Require Composer autoloader
 require_once __DIR__ . '/vendor/autoload.php';
 
-use CodeRex\Telemetry\Client;
+use Linno\Telemetry\Client;
 
 // Optional: Set text domain for i18n (defaults to plugin slug)
 Client::set_text_domain( 'my-awesome-plugin' );
@@ -143,11 +143,12 @@ $telemetry_client->init();
 
 ### What Happens Next?
 
-1.  **Plugin Activation**: When the plugin is activated, the SDK (which internally registered the activation hook during `$telemetry_client->init()`) triggers the `activate` method. This tracks the `plugin_activated` event and ensures the database table is created.
-2.  **User Consent Notice**: For new installations, an admin notice will ask the user for consent to track usage data.
-3.  **User Choice**: If the user allows, PLG events (setup, first strike, KUI) and custom events will be tracked automatically based on your trigger configuration. If not, only non-consent events are tracked.
-4.  **Deactivation Feedback**: Upon deactivation, a modal will prompt the user for a reason, which is tracked. This is handled automatically by the library's internal deactivation hook.
-5.  **Asynchronous Sending**: All events are added to a local queue and sent to OpenPanel in batches via a daily WP-Cron job.
+1.  **Plugin Activation**: When the plugin is activated, the SDK (which internally registered the activation hook during `$telemetry_client->init()`) triggers the `activate` method and tracks the `plugin_activated` event.
+2.  **Global Consent Notice (One Time)**: On the first Linno plugin installation, an admin notice asks for telemetry consent.
+3.  **Shared Consent Across Linno Plugins**: Once allowed (or declined), the choice is reused for all other Linno plugins on that same site.
+4.  **Table Creation After Consent**: The telemetry queue table is created only after consent is allowed, and only once per site.
+5.  **Deactivation Feedback**: Upon deactivation, a modal will prompt the user for a reason, which is tracked. This is handled automatically by the library's internal deactivation hook.
+6.  **Asynchronous Sending**: All events are added to a local queue and sent to OpenPanel in batches via a daily WP-Cron job.
 
 ## Trigger System
 
@@ -230,8 +231,24 @@ With user consent, the SDK collects:
 
 **No sensitive personal data** is collected beyond what is strictly necessary for anonymous usage analytics and product improvement, and only with explicit user consent.
 
+## Appsero Consent Compatibility
+
+The SDK supports migration from Appsero consent keys so existing users are not prompted again.
+
+- Primary key: `linno_telemetry_allow_tracking`
+- Legacy pattern: `{plugin_slug}_allow_tracking`
+- Also checks known legacy keys:
+    - `best-woocommerce-feed_allow_tracking`
+    - `wpvr_allow_tracking`
+    - `wpfunnels_allow_tracking`
+    - `cart-lift_allow_tracking`
+    - `creatorlms_allow_tracking`
+    - `mail-mint_allow_tracking`
+
+If a legacy key exists with `yes` or `no` and `linno_telemetry_allow_tracking` is not set, the value is automatically reused and migrated to the Linno key.
+
 ## License
 GPL-2.0-or-later
 
 ## Support
-For support, please contact support@coderex.co
+For support, please contact support@linno.co

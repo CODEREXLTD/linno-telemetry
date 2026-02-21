@@ -5,11 +5,11 @@
  * Handles automatic event tracking through configured triggers.
  * Supports setup, first_strike, and KUI events with threshold-based tracking.
  *
- * @package CodeRex\Telemetry
+ * @package Linno\Telemetry
  * @since 1.0.0
  */
 
-namespace CodeRex\Telemetry;
+namespace Linno\Telemetry;
 
 class TriggerManager {
     /**

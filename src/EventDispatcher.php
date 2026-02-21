@@ -5,14 +5,14 @@
  * Orchestrates event sending by normalizing payloads, adding system information,
  * validating data, and delegating transmission to the appropriate driver.
  *
- * @package CodeRex\Telemetry
+ * @package Linno\Telemetry
  * @since 1.0.0
  */
 
-namespace CodeRex\Telemetry;
+namespace Linno\Telemetry;
 
-use CodeRex\Telemetry\Drivers\DriverInterface;
-use CodeRex\Telemetry\Helpers\Utils;
+use Linno\Telemetry\Drivers\DriverInterface;
+use Linno\Telemetry\Helpers\Utils;
 
 /**
  * EventDispatcher class

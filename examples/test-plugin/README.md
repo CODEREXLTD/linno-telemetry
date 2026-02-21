@@ -1,10 +1,10 @@
 # Test Telemetry Plugin
 
-A comprehensive test WordPress plugin to demonstrate and validate all functionality of the CodeRex Telemetry SDK.
+A comprehensive test WordPress plugin to demonstrate and validate all functionality of the Linno Telemetry SDK.
 
 ## Purpose
 
-This plugin serves as both a testing tool and a reference implementation for integrating the CodeRex Telemetry SDK into WordPress plugins.
+This plugin serves as both a testing tool and a reference implementation for integrating the Linno Telemetry SDK into WordPress plugins.
 
 ## Installation
 
@@ -46,7 +46,7 @@ This plugin serves as both a testing tool and a reference implementation for int
 2. **Install dependencies in the plugin directory**:
    ```bash
    cd /path/to/wordpress/wp-content/plugins/test-telemetry-plugin
-   composer require coderexltd/telemetry
+   composer require linno/telemetry
    ```
 
 3. **Configure API Key**:
@@ -94,8 +94,8 @@ The plugin demonstrates automatic event tracking:
 
 Shows how to use SDK filters:
 
-- `coderex_telemetry_report_interval`: Customize reporting frequency
-- `coderex_telemetry_system_info`: Add custom system information
+- `linno_telemetry_report_interval`: Customize reporting frequency
+- `linno_telemetry_system_info`: Add custom system information
 
 ## Testing Scenarios
 
@@ -238,7 +238,7 @@ tail -f /var/log/php/error.log
 **SDK Not Loading**
 - Verify Composer autoloader is present: `vendor/autoload.php`
 - Check that `composer install` was run successfully
-- Verify namespace is correct: `CodeRex\Telemetry\Client`
+- Verify namespace is correct: `Linno\Telemetry\Client`
 
 **Events Not Sending**
 - Check consent status (must be "yes")
@@ -287,7 +287,7 @@ After completing all tests, you should see these events in OpenPanel:
 
 ```php
 // Using helper function
-coderex_telemetry_track('user_action', [
+linno_telemetry_track('user_action', [
     'action_type' => 'button_click',
     'button_id' => 'save_settings'
 ]);
@@ -304,12 +304,12 @@ if (isset($GLOBALS['test_telemetry_client'])) {
 
 ```php
 // Change reporting interval
-add_filter('coderex_telemetry_report_interval', function($interval) {
+add_filter('linno_telemetry_report_interval', function($interval) {
     return 'daily'; // or 'hourly', 'twicedaily'
 });
 
 // Add custom system info
-add_filter('coderex_telemetry_system_info', function($info) {
+add_filter('linno_telemetry_system_info', function($info) {
     $info['custom_field'] = 'custom_value';
     return $info;
 });

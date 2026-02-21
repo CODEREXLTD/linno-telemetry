@@ -1,5 +1,5 @@
 <?php
-namespace CodeRex\Telemetry;
+namespace Linno\Telemetry;
 
 class Queue {
     /**
@@ -14,7 +14,7 @@ class Queue {
      */
     public function __construct() {
         global $wpdb;
-        $this->table_name = $wpdb->prefix . 'coderex_telemetry_queue';
+        $this->table_name = $wpdb->prefix . 'linno_telemetry_queue';
     }
 
     /**

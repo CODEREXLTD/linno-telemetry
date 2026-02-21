@@ -1,11 +1,11 @@
 <?php
 /**
  * Plugin Name: Test Telemetry Plugin
- * Plugin URI: https://coderex.co
- * Description: A test plugin to demonstrate and validate CodeRex Telemetry SDK functionality
+ * Plugin URI: https://linno.co
+ * Description: A test plugin to demonstrate and validate Linno Telemetry SDK functionality
  * Version: 1.0.0
- * Author: Code Rex
- * Author URI: https://coderex.co
+ * Author: Linno
+ * Author URI: https://linno.co
  * License: GPL-2.0-or-later
  * Text Domain: test-telemetry-plugin
  * Requires at least: 5.0
@@ -37,7 +37,7 @@ else {
     return;
 }
 
-use CodeRex\Telemetry\Client;
+use Linno\Telemetry\Client;
 
 /**
  * Global telemetry client instance.
@@ -244,7 +244,7 @@ function test_telemetry_admin_page() {
         <h1>Telemetry SDK Test Page</h1>
         
         <p class="description" style="background: #fff; padding: 15px; border-left: 4px solid #00a0d2;">
-            <strong>Note:</strong> This test plugin demonstrates integration with the CodeRex Telemetry SDK.
+            <strong>Note:</strong> This test plugin demonstrates integration with the Linno Telemetry SDK.
             Consent notices and deactivation modals will appear as expected. Events are added to a queue and sent via WP-Cron.
         </p>
         
@@ -342,7 +342,7 @@ function test_telemetry_admin_page() {
             <p><strong>Plugin File:</strong> <?php echo esc_html(__FILE__); ?></p>
             <p><strong>Plugin Folder:</strong> test-telemetry-plugin</p>
             <p><strong>Plugin Version:</strong> 1.0.0</p>
-            <p><strong>SDK Loaded:</strong> <?php echo class_exists('CodeRex\Telemetry\Client') ? '✓ Yes' : '✗ No'; ?></p>
+            <p><strong>SDK Loaded:</strong> <?php echo class_exists('Linno\Telemetry\Client') ? '✓ Yes' : '✗ No'; ?></p>
             <?php 
             if ($test_telemetry_client instanceof Client): ?>
                 <p style="color: green;"><strong>✓ Telemetry Client Initialized</strong></p>

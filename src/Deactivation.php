@@ -1,5 +1,5 @@
 <?php
-namespace CodeRex\Telemetry;
+namespace Linno\Telemetry;
 
 class Deactivation {
     /**

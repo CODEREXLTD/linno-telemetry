@@ -1,5 +1,5 @@
 <?php
-namespace CodeRex\Telemetry;
+namespace Linno\Telemetry;
 
 class Consent {
     /**
@@ -51,7 +51,7 @@ class Consent {
         }
 
         if ( $_GET['action'] === 'optin' ) {
-            update_option( $this->client->get_optin_key(), 'yes' );
+            $this->client->set_optin_state( 'yes' );
             $this->dismiss_notice();
 
             // Explicitly call activate() to ensure table is created and flags are set.
@@ -60,7 +60,7 @@ class Consent {
         }
 
         if ( $_GET['action'] === 'optout' ) {
-            update_option( $this->client->get_optin_key(), 'no' );
+            $this->client->set_optin_state( 'no' );
             $this->dismiss_notice();
         }
 
@@ -79,7 +79,7 @@ class Consent {
         }
 
         // Don't show the notice if the user has already opted in or out
-        if ( get_option( $this->client->get_optin_key() ) ) {
+        if ( null !== $this->client->get_optin_state() ) {
             return;
         }
         
@@ -99,11 +99,14 @@ class Consent {
         <div class="notice notice-info">
             <p>
                 <?php
-                $privacy_policy_url = '#'; // Placeholder, replace with actual privacy policy URL
+                $privacy_policy_url = apply_filters(
+                    $this->client->get_slug() . '_telemetry_privacy_policy_url',
+                    'https://linno.co/privacy-policy/'
+                );
                 $message = apply_filters(
                     $this->client->get_slug() . '_telemetry_consent_message',
                     sprintf(
-                        __( 'Help us improve %1$s! Allow the plugin to collect anonymous usage data to help us improve the plugin. We do not collect any sensitive data or your admin email. Your privacy is important, and you will always remain anonymous. <a href="%2$s" target="_blank">Learn more</a>.', $this->textDomain ),
+                        __( 'Help us improve %1$s. With your permission, this plugin sends usage and technical data to OpenPanel, including: site URL, plugin name and version, event timestamps, anonymous site profile ID, custom event properties, and your current admin profile details (email, first name, last name, and avatar) for identification and product support. Tracking is off by default. <a href="%2$s" target="_blank" rel="noopener noreferrer">Learn more</a>.', $this->textDomain ),
                         '<strong>' . $plugin_name . '</strong>',
                         esc_url( $privacy_policy_url )
                     )
@@ -143,6 +146,6 @@ class Consent {
      * @return string
      */
     private function get_notice_dismissed_key(): string {
-        return $this->client->get_slug() . '_telemetry_notice_dismissed';
+        return $this->client->get_notice_dismissed_key();
     }
 }

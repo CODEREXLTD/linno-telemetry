@@ -2,11 +2,11 @@
 /**
  * Driver Interface for analytics platforms
  *
- * @package CodeRex\Telemetry
+ * @package Linno\Telemetry
  * @since 1.0.0
  */
 
-namespace CodeRex\Telemetry\Drivers;
+namespace Linno\Telemetry\Drivers;
 
 /**
  * Interface DriverInterface

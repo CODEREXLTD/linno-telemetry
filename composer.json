@@ -1,12 +1,12 @@
 {
-    "name": "coderexltd/telemetry",
-    "description": "Privacy-first telemetry SDK for Code Rex WordPress plugins",
+    "name": "linno/telemetry",
+    "description": "Privacy-first telemetry SDK for Linno WordPress plugins",
     "type": "library",
     "license": "GPL-2.0-or-later",
     "authors": [
         {
-            "name": "Code Rex",
-            "email": "support@coderex.co"
+            "name": "Linno",
+            "email": "support@linno.co"
         }
     ],
     "require": {
@@ -18,7 +18,7 @@
     },
     "autoload": {
         "psr-4": {
-            "CodeRex\\Telemetry\\": "src/"
+            "Linno\\Telemetry\\": "src/"
         },
         "files": [
             "src/helpers.php"
@@ -26,7 +26,7 @@
     },
     "autoload-dev": {
         "psr-4": {
-            "CodeRex\\Telemetry\\Tests\\": "tests/"
+            "Linno\\Telemetry\\Tests\\": "tests/"
         }
     },
     "minimum-stability": "stable",

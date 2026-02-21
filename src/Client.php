@@ -5,14 +5,14 @@
  * Main entry point for plugin developers to integrate telemetry tracking.
  * Handles initialization, configuration, and provides the public API for tracking events.
  *
- * @package CodeRex\Telemetry
+ * @package Linno\Telemetry
  * @since 1.0.0
  */
 
-namespace CodeRex\Telemetry;
+namespace Linno\Telemetry;
 
-use CodeRex\Telemetry\Drivers\OpenPanelDriver;
-use CodeRex\Telemetry\Helpers\Utils;
+use Linno\Telemetry\Drivers\OpenPanelDriver;
+use Linno\Telemetry\Helpers\Utils;
 use InvalidArgumentException;
 
 /**
@@ -24,6 +24,38 @@ use InvalidArgumentException;
  * @since 1.0.0
  */
 class Client {
+    /**
+     * Global option key for telemetry consent.
+     */
+    private const GLOBAL_OPTIN_KEY = 'linno_telemetry_allow_tracking';
+
+    /**
+     * Known legacy Appsero consent option keys.
+     */
+    private const LEGACY_APPSERO_OPTIN_KEYS = array(
+        'best-woocommerce-feed_allow_tracking',
+        'wpvr_allow_tracking',
+        'wpfunnels_allow_tracking',
+        'cart-lift_allow_tracking',
+        'creatorlms_allow_tracking',
+        'mail-mint_allow_tracking',
+    );
+
+    /**
+     * Global option key for telemetry queue table creation state.
+     */
+    private const GLOBAL_TABLE_CREATED_KEY = 'linno_telemetry_table_created';
+
+    /**
+     * Global option key for telemetry notice dismissal state.
+     */
+    private const GLOBAL_NOTICE_DISMISSED_KEY = 'linno_telemetry_notice_dismissed';
+
+    /**
+     * Global option key for shared telemetry unique ID.
+     */
+    private const GLOBAL_UNIQUE_ID_KEY = 'linno_telemetry_unique_id';
+
     /**
      * Configuration data (apiKey, apiSecret, pluginName, pluginFile, slug, version, unique_id)
      *
@@ -140,10 +172,10 @@ class Client {
         register_activation_hook( $this->config['pluginFile'], [ $this, 'activate' ] );
         register_deactivation_hook( $this->config['pluginFile'], [ $this, 'deactivate' ] );
 
-        // Ensure table is created if it was missed by the activation hook
-        if ( ! get_option( $this->config['slug'] . '_telemetry_table_created' ) ) {
+        // Ensure table exists for already-consented sites.
+        if ( $this->isOptInEnabled() && ! get_option( self::GLOBAL_TABLE_CREATED_KEY ) ) {
             $this->create_queue_table();
-            update_option( $this->config['slug'] . '_telemetry_table_created', 'yes' );
+            update_option( self::GLOBAL_TABLE_CREATED_KEY, 'yes' );
         }
     }
 
@@ -153,9 +185,12 @@ class Client {
      * @return void
      */
     public function activate(): void {
-        $this->create_queue_table();
-        update_option( $this->config['slug'] . '_telemetry_table_created', 'yes' );
-        
+        // Create queue table only after global consent is granted.
+        if ( $this->isOptInEnabled() && ! get_option( self::GLOBAL_TABLE_CREATED_KEY ) ) {
+            $this->create_queue_table();
+            update_option( self::GLOBAL_TABLE_CREATED_KEY, 'yes' );
+        }
+
         // Only set pending if not already tracked
         if ( ! get_option( $this->config['slug'] . '_telemetry_activated_tracked' ) ) {
             update_option( $this->config['slug'] . '_telemetry_activation_pending', 'yes', false );
@@ -290,8 +325,90 @@ class Client {
      * @since 1.0.0
      */
     private function isOptInEnabled(): bool {
-        // This will be replaced by the Consent class logic
-        return 'yes' === get_option( $this->get_optin_key(), 'no' );
+        return 'yes' === $this->get_optin_state();
+    }
+
+    /**
+     * Get normalized consent state from current or legacy keys.
+     *
+     * Priority order:
+     * 1) Linno global key
+     * 2) Current plugin's Appsero-style key ({slug}_allow_tracking)
+     * 3) Known legacy Appsero keys
+     *
+     * If a legacy key is found and Linno global key is missing,
+     * the value is migrated to Linno global key for future reads.
+     *
+     * @return string|null Returns 'yes', 'no', or null when no decision exists.
+     */
+    public function get_optin_state(): ?string {
+        $global_state = $this->normalize_optin_value( get_option( $this->get_optin_key(), null ) );
+        if ( null !== $global_state ) {
+            return $global_state;
+        }
+
+        foreach ( $this->get_legacy_optin_keys() as $legacy_key ) {
+            $legacy_state = $this->normalize_optin_value( get_option( $legacy_key, null ) );
+            if ( null !== $legacy_state ) {
+                update_option( $this->get_optin_key(), $legacy_state );
+                return $legacy_state;
+            }
+        }
+
+        return null;
+    }
+
+    /**
+     * Persist consent decision to Linno key and current plugin legacy key.
+     *
+     * @param string $state Accepted values: 'yes' or 'no'.
+     * @return void
+     */
+    public function set_optin_state( string $state ): void {
+        $normalized_state = $this->normalize_optin_value( $state );
+
+        if ( null === $normalized_state ) {
+            return;
+        }
+
+        update_option( $this->get_optin_key(), $normalized_state );
+        update_option( $this->get_slug() . '_allow_tracking', $normalized_state );
+    }
+
+    /**
+     * Get all legacy consent keys to check for migration.
+     *
+     * @return array
+     */
+    public function get_legacy_optin_keys(): array {
+        return array_values(
+            array_unique(
+                array_merge(
+                    array( $this->get_slug() . '_allow_tracking' ),
+                    self::LEGACY_APPSERO_OPTIN_KEYS
+                )
+            )
+        );
+    }
+
+    /**
+     * Normalize stored consent value.
+     *
+     * @param mixed $value
+     * @return string|null
+     */
+    private function normalize_optin_value( $value ): ?string {
+        if ( is_string( $value ) ) {
+            $value = strtolower( trim( $value ) );
+            if ( 'yes' === $value ) {
+                return 'yes';
+            }
+            if ( 'no' === $value ) {
+                return 'no';
+            }
+        }
+
+        return null;
     }
 
     /**
@@ -300,7 +417,16 @@ class Client {
      * @return string
      */
     public function get_optin_key(): string {
-        return $this->config['slug'] . '_allow_tracking';
+        return self::GLOBAL_OPTIN_KEY;
+    }
+
+    /**
+     * Get the global option key for notice dismissal.
+     *
+     * @return string
+     */
+    public function get_notice_dismissed_key(): string {
+        return self::GLOBAL_NOTICE_DISMISSED_KEY;
     }
 
     /**
@@ -599,12 +725,11 @@ class Client {
      * @return string
      */
     private function get_or_create_unique_id(): string {
-        $option_name = $this->config['slug'] . '_telemetry_unique_id';
-        $unique_id = get_option( $option_name );
+        $unique_id = get_option( self::GLOBAL_UNIQUE_ID_KEY );
 
         if ( empty( $unique_id ) ) {
             $unique_id = function_exists( 'wp_generate_uuid4' ) ? wp_generate_uuid4() : uniqid();
-            update_option( $option_name, $unique_id, false );
+            update_option( self::GLOBAL_UNIQUE_ID_KEY, $unique_id, false );
         }
 
         return $unique_id;

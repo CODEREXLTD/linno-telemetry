@@ -1,12 +1,12 @@
 <?php
 /**
- * Global helper functions for CodeRex Telemetry SDK
+ * Global helper functions for Linno Telemetry SDK
  *
- * @package CodeRex\Telemetry
+ * @package Linno\Telemetry
  * @since 1.0.0
  */
 
-if (!function_exists('coderex_telemetry')) {
+if (!function_exists('linno_telemetry')) {
     /**
      * Get the Telemetry Client instance for a specific plugin
      *
@@ -14,15 +14,15 @@ if (!function_exists('coderex_telemetry')) {
      * The Client must be initialized elsewhere in the plugin before calling this function.
      *
      * @param string $plugin_file The main plugin file path (use __FILE__ from your main plugin file)
-     * @return \CodeRex\Telemetry\Client|null The Client instance or null if not initialized
+    * @return \Linno\Telemetry\Client|null The Client instance or null if not initialized
      * @since 1.0.0
      */
-    function coderex_telemetry(string $plugin_file) {
-        return \CodeRex\Telemetry\Client::getInstance($plugin_file);
+    function linno_telemetry(string $plugin_file) {
+        return \Linno\Telemetry\Client::getInstance($plugin_file);
     }
 }
 
-if (!function_exists('coderex_telemetry_track')) {
+if (!function_exists('linno_telemetry_track')) {
     /**
      * Track a telemetry event for a specific plugin
      *
@@ -37,8 +37,8 @@ if (!function_exists('coderex_telemetry_track')) {
      * @return bool True if event was sent successfully, false otherwise
      * @since 1.0.0
      */
-    function coderex_telemetry_track(string $plugin_file, string $event, array $properties = []): bool {
-        $client = coderex_telemetry($plugin_file);
+    function linno_telemetry_track(string $plugin_file, string $event, array $properties = []): bool {
+        $client = linno_telemetry($plugin_file);
 
         if ($client === null) {
             return false;
@@ -48,7 +48,7 @@ if (!function_exists('coderex_telemetry_track')) {
     }
 }
 
-if (!function_exists('coderex_telemetry_generate_profile_id')) {
+if (!function_exists('linno_telemetry_generate_profile_id')) {
     /**
      * Generate a UUID v4 for profile identification
      *
@@ -58,12 +58,12 @@ if (!function_exists('coderex_telemetry_generate_profile_id')) {
      * @return string UUID v4 string
      * @since 1.0.0
      */
-    function coderex_telemetry_generate_profile_id(): string {
-        return \CodeRex\Telemetry\Helpers\Utils::generateProfileId();
+    function linno_telemetry_generate_profile_id(): string {
+        return \Linno\Telemetry\Helpers\Utils::generateProfileId();
     }
 }
 
-if (!function_exists('coderex_telemetry_update_last_action')) {
+if (!function_exists('linno_telemetry_update_last_action')) {
     /**
      * Update the last core action for a plugin
      *
@@ -77,8 +77,8 @@ if (!function_exists('coderex_telemetry_update_last_action')) {
      * @return bool True on success, false on failure
      * @since 1.0.0
      */
-    function coderex_telemetry_update_last_action(string $plugin_file, string $action): bool {
-        $client = coderex_telemetry($plugin_file);
+    function linno_telemetry_update_last_action(string $plugin_file, string $action): bool {
+        $client = linno_telemetry($plugin_file);
 
         if ($client === null) {
             return false;
