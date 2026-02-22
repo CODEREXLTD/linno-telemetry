@@ -241,12 +241,6 @@ class Client {
      * @return void
      */
     public function activate(): void {
-        // Create queue table only after global consent is granted.
-        if ( $this->isOptInEnabled() && ! get_option( self::GLOBAL_TABLE_CREATED_KEY ) ) {
-            $this->create_queue_table();
-            update_option( self::GLOBAL_TABLE_CREATED_KEY, 'yes' );
-        }
-
         // Only set pending if not already tracked
         if ( ! get_option( $this->config['slug'] . '_telemetry_activated_tracked' ) ) {
             update_option( $this->config['slug'] . '_telemetry_activation_pending', 'yes', false );
@@ -255,9 +249,7 @@ class Client {
         // If the user is already opted-in, track the activation event immediately
         // as the consent modal won't be shown again.
         if ( $this->isOptInEnabled() ) {
-            $this->track_immediate( 'plugin_activated', [ 'site_url' => get_site_url(), 'unique_id' => $this->config['unique_id'] ], true );
-            update_option( $this->config['slug'] . '_telemetry_activated_tracked', 'yes' );
-            delete_option( $this->config['slug'] . '_telemetry_activation_pending' );
+            $this->finalize_optin_setup();
         }
     }
 
@@ -429,6 +421,24 @@ class Client {
 
         update_option( $this->get_optin_key(), $normalized_state );
         update_option( $this->get_slug() . '_allow_tracking', $normalized_state );
+
+        if ( 'yes' === $normalized_state ) {
+            $this->finalize_optin_setup();
+        }
+    }
+
+    /**
+     * Synchronize telemetry side effects after consent changes.
+     *
+     * Use this when consent is managed in a custom onboarding flow and
+     * state was persisted outside set_optin_state().
+     *
+     * @return void
+     */
+    public function sync_consent_state(): void {
+        if ( $this->isOptInEnabled() ) {
+            $this->finalize_optin_setup();
+        }
     }
 
     /**
@@ -726,6 +736,36 @@ class Client {
      */
     public function get_cron_hook(): string {
         return $this->config['slug'] . '_telemetry_queue_process';
+    }
+
+    /**
+     * Finalize required setup once user has granted telemetry consent.
+     *
+     * Creates queue table (once) and flushes pending activation tracking.
+     *
+     * @return void
+     */
+    private function finalize_optin_setup(): void {
+        if ( ! get_option( self::GLOBAL_TABLE_CREATED_KEY ) ) {
+            $this->create_queue_table();
+            update_option( self::GLOBAL_TABLE_CREATED_KEY, 'yes' );
+        }
+
+        $activation_pending = 'yes' === get_option( $this->config['slug'] . '_telemetry_activation_pending' );
+        $activation_tracked = 'yes' === get_option( $this->config['slug'] . '_telemetry_activated_tracked' );
+
+        if ( $activation_pending && ! $activation_tracked ) {
+            $this->track_immediate(
+                'plugin_activated',
+                [
+                    'site_url'  => get_site_url(),
+                    'unique_id' => $this->config['unique_id'],
+                ],
+                true
+            );
+            update_option( $this->config['slug'] . '_telemetry_activated_tracked', 'yes' );
+            delete_option( $this->config['slug'] . '_telemetry_activation_pending' );
+        }
     }
 
     /**

@@ -156,6 +156,33 @@ $telemetry_client->init();
 5.  **Deactivation Feedback**: Upon deactivation, a modal will prompt the user for a reason, which is tracked. This is handled automatically by the library's internal deactivation hook.
 6.  **Asynchronous Sending**: All events are added to a local queue and sent to OpenPanel in batches via a daily WP-Cron job.
 
+### Onboarding Consent Flow (Important)
+
+If your plugin asks for consent inside a custom onboarding wizard (instead of using the default admin notice), activation happens first, so `plugin_activated` is initially marked as pending.
+
+When the user allows tracking in onboarding, call:
+
+```php
+$telemetry_client->set_optin_state( 'yes' );
+```
+
+This now automatically:
+
+- creates the queue table (if needed), and
+- flushes pending `plugin_activated` tracking exactly once.
+
+If your onboarding stores consent in your own option first, call this right after saving to keep telemetry state in sync:
+
+```php
+$telemetry_client->sync_consent_state();
+```
+
+Or use the global helper (no direct client call needed):
+
+```php
+linno_telemetry_sync_consent_state( __FILE__ );
+```
+
 ## Trigger System
 
 The SDK provides a unified way to configure automatic event tracking. Developers define **when** to trigger events, and the library handles the rest.

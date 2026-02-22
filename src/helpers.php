@@ -88,3 +88,28 @@ if (!function_exists('linno_telemetry_update_last_action')) {
         return true;
     }
 }
+
+if (!function_exists('linno_telemetry_sync_consent_state')) {
+    /**
+     * Synchronize telemetry state after custom onboarding consent updates
+     *
+     * Use this helper when your onboarding flow stores consent directly
+     * (outside of Client::set_optin_state()). It ensures post-consent
+     * setup is completed, including pending activation tracking.
+     *
+     * @param string $plugin_file The main plugin file path
+     *
+     * @return bool True on success, false if client is unavailable
+     * @since 1.0.1
+     */
+    function linno_telemetry_sync_consent_state(string $plugin_file): bool {
+        $client = linno_telemetry($plugin_file);
+
+        if ($client === null) {
+            return false;
+        }
+
+        $client->sync_consent_state();
+        return true;
+    }
+}
