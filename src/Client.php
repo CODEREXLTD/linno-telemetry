@@ -228,10 +228,14 @@ class Client {
         register_activation_hook( $this->config['pluginFile'], [ $this, 'activate' ] );
         register_deactivation_hook( $this->config['pluginFile'], [ $this, 'deactivate' ] );
 
-        // Ensure table exists for already-consented sites.
-        if ( $this->isOptInEnabled() && ! get_option( self::GLOBAL_TABLE_CREATED_KEY ) ) {
-            $this->create_queue_table();
-            update_option( self::GLOBAL_TABLE_CREATED_KEY, 'yes' );
+        // Recovery path: if init() runs after activation (e.g., late onboarding bootstrap),
+        // ensure activation can still be tracked once consent is granted.
+        $this->maybe_mark_activation_pending_for_active_plugin();
+
+        // Ensure post-consent setup is completed for already-consented sites,
+        // including pending activation tracking in wizard-driven flows.
+        if ( $this->isOptInEnabled() ) {
+            $this->finalize_optin_setup();
         }
     }
 
@@ -436,6 +440,8 @@ class Client {
      * @return void
      */
     public function sync_consent_state(): void {
+        $this->maybe_mark_activation_pending_for_active_plugin();
+
         if ( $this->isOptInEnabled() ) {
             $this->finalize_optin_setup();
         }
@@ -746,6 +752,8 @@ class Client {
      * @return void
      */
     private function finalize_optin_setup(): void {
+        $this->maybe_mark_activation_pending_for_active_plugin();
+
         if ( ! get_option( self::GLOBAL_TABLE_CREATED_KEY ) ) {
             $this->create_queue_table();
             update_option( self::GLOBAL_TABLE_CREATED_KEY, 'yes' );
@@ -765,6 +773,36 @@ class Client {
             );
             update_option( $this->config['slug'] . '_telemetry_activated_tracked', 'yes' );
             delete_option( $this->config['slug'] . '_telemetry_activation_pending' );
+        }
+    }
+
+    /**
+     * Mark activation as pending when plugin is already active but activation hook was missed.
+     *
+     * This covers flows where the telemetry client initializes after activation,
+     * such as setup wizard based bootstrapping.
+     *
+     * @return void
+     */
+    private function maybe_mark_activation_pending_for_active_plugin(): void {
+        $activation_pending = 'yes' === get_option( $this->config['slug'] . '_telemetry_activation_pending' );
+        $activation_tracked = 'yes' === get_option( $this->config['slug'] . '_telemetry_activated_tracked' );
+
+        if ( $activation_pending || $activation_tracked ) {
+            return;
+        }
+
+        $plugin_basename = plugin_basename( $this->config['pluginFile'] );
+        $active_plugins  = (array) get_option( 'active_plugins', [] );
+        $is_active       = in_array( $plugin_basename, $active_plugins, true );
+
+        if ( ! $is_active && is_multisite() ) {
+            $network_active_plugins = (array) get_site_option( 'active_sitewide_plugins', [] );
+            $is_active = isset( $network_active_plugins[ $plugin_basename ] );
+        }
+
+        if ( $is_active ) {
+            update_option( $this->config['slug'] . '_telemetry_activation_pending', 'yes', false );
         }
     }
 

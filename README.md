@@ -183,6 +183,10 @@ Or use the global helper (no direct client call needed):
 linno_telemetry_sync_consent_state( __FILE__ );
 ```
 
+No manual `plugin_activated` tracking is needed in your plugin. The SDK now also recovers this event when telemetry is initialized after activation (common in setup-wizard-driven bootstraps).
+
+If your wizard writes the consent option directly (without calling SDK methods), the SDK will still detect consent on `init()` and flush pending `plugin_activated` on the next request.
+
 ## Trigger System
 
 The SDK provides a unified way to configure automatic event tracking. Developers define **when** to trigger events, and the library handles the rest.
