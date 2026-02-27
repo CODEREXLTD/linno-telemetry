@@ -376,10 +376,15 @@ class Deactivation {
      * @return void
      */
     private function track_deactivation( string $reason_id, string $reason_info ): void {
-        $this->client->track_immediate( 'plugin_deactivated', [
-            'reason_id' => $reason_id,
-            'reason_info' => $reason_info,
-        ] );
+        $reason = ! empty( $reason_info ) ? $reason_info : $reason_id;
+
+        $this->client->track_lifecycle_event(
+            'plugin_deactivated',
+            [
+                'site_url' => get_site_url(),
+                'reason'   => $reason,
+            ]
+        );
 
         // Set a transient to indicate that a deactivation event has been sent from the feedback form.
         // This prevents the generic deactivation hook from sending another one.

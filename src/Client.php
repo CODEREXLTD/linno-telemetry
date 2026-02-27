@@ -30,6 +30,16 @@ class Client {
     private const GLOBAL_OPTIN_KEY = 'linno_telemetry_allow_tracking';
 
     /**
+     * Consent schema version marker.
+     */
+    private const GLOBAL_CONSENT_VERSION_KEY = 'linno_telemetry_consent_version';
+
+    /**
+     * Current consent schema version.
+     */
+    private const CONSENT_VERSION = '2';
+
+    /**
      * Known legacy Appsero consent option keys.
      */
     private const LEGACY_APPSERO_OPTIN_KEYS = array(
@@ -216,6 +226,8 @@ class Client {
      * @return void
      */
     public function init(): void {
+        $this->maybe_upgrade_consent_state();
+
         if ( ! empty( self::$textDomain ) ) {
             load_plugin_textdomain( self::$textDomain, false, dirname( plugin_basename( $this->config['pluginFile'] ) ) . '/languages' );
         }
@@ -228,12 +240,7 @@ class Client {
         register_activation_hook( $this->config['pluginFile'], [ $this, 'activate' ] );
         register_deactivation_hook( $this->config['pluginFile'], [ $this, 'deactivate' ] );
 
-        // Recovery path: if init() runs after activation (e.g., late onboarding bootstrap),
-        // ensure activation can still be tracked once consent is granted.
-        $this->maybe_mark_activation_pending_for_active_plugin();
-
-        // Ensure post-consent setup is completed for already-consented sites,
-        // including pending activation tracking in wizard-driven flows.
+        // Ensure post-consent setup is completed for already-consented sites.
         if ( $this->isOptInEnabled() ) {
             $this->finalize_optin_setup();
         }
@@ -245,15 +252,16 @@ class Client {
      * @return void
      */
     public function activate(): void {
-        // Only set pending if not already tracked
+        // Track activation without consent using minimal non-personal payload.
         if ( ! get_option( $this->config['slug'] . '_telemetry_activated_tracked' ) ) {
-            update_option( $this->config['slug'] . '_telemetry_activation_pending', 'yes', false );
-        }
+            $this->track_lifecycle_event(
+                'plugin_activated',
+                [
+                    'site_url' => get_site_url(),
+                ]
+            );
 
-        // If the user is already opted-in, track the activation event immediately
-        // as the consent modal won't be shown again.
-        if ( $this->isOptInEnabled() ) {
-            $this->finalize_optin_setup();
+            update_option( $this->config['slug'] . '_telemetry_activated_tracked', 'yes' );
         }
     }
 
@@ -281,7 +289,13 @@ class Client {
         $transient_key = $this->get_slug() . '_deactivation_event_sent';
         if ( 'yes' !== get_transient( $transient_key ) ) {
             // Send a generic deactivation event if the feedback form didn't send one
-            $this->track_immediate( 'plugin_deactivated', [ 'site_url' => get_site_url(), 'unique_id' => $this->config['unique_id'], 'feedback_provided' => false ] );
+            $this->track_lifecycle_event(
+                'plugin_deactivated',
+                [
+                    'site_url' => get_site_url(),
+                    'reason'   => 'none',
+                ]
+            );
         }
         // Clean up the transient regardless
         delete_transient( $transient_key );
@@ -369,6 +383,35 @@ class Client {
     }
 
     /**
+     * Track lifecycle events without consent using a strict non-personal payload.
+     *
+     * Allowed properties:
+     * - plugin_activated: site_url, unique_id
+     * - plugin_deactivated: site_url, unique_id, reason
+     *
+     * @param string $event Event name.
+     * @param array  $properties Event properties.
+     *
+     * @return void
+     */
+    public function track_lifecycle_event( string $event, array $properties = array() ): void {
+        $minimal_properties = array(
+            'site_url'  => esc_url_raw( (string) ( $properties['site_url'] ?? get_site_url() ) ),
+            'unique_id' => sanitize_text_field( (string) ( $properties['unique_id'] ?? $this->config['unique_id'] ) ),
+        );
+
+        if ( 'plugin_deactivated' === $event ) {
+            $minimal_properties['reason'] = sanitize_text_field( (string) ( $properties['reason'] ?? 'none' ) );
+        }
+
+        $result = $this->handlers['dispatcher']->dispatch_minimal( $event, $minimal_properties );
+
+        if ( $result ) {
+            update_option( $this->config['slug'] . '_telemetry_last_send', time(), false );
+        }
+    }
+
+    /**
      * Check if opt-in is enabled
      *
      * Checks if the user has opted in to telemetry tracking.
@@ -440,18 +483,16 @@ class Client {
      * @return void
      */
     public function sync_consent_state(): void {
-        $this->maybe_mark_activation_pending_for_active_plugin();
-
         if ( $this->isOptInEnabled() ) {
             $this->finalize_optin_setup();
         }
     }
 
-    /**
-     * Get all legacy consent keys to check for migration.
-     *
-     * @return array
-     */
+        /**
+         * Get all legacy consent keys to check for migration.
+         *
+         * @return array
+         */
     public function get_legacy_optin_keys(): array {
         return array_values(
             array_unique(
@@ -719,6 +760,28 @@ class Client {
     }
 
     /**
+     * Upgrade consent state to the current schema version.
+     *
+     * This intentionally clears prior consent + notice state that may have
+     * been influenced by legacy compatibility behavior, so only new
+     * Linno consent decisions are used going forward.
+     *
+     * @return void
+     */
+    private function maybe_upgrade_consent_state(): void {
+        $current_version = (string) get_option( self::GLOBAL_CONSENT_VERSION_KEY, '' );
+
+        if ( self::CONSENT_VERSION === $current_version ) {
+            return;
+        }
+
+        delete_option( self::GLOBAL_OPTIN_KEY );
+        delete_option( self::GLOBAL_NOTICE_DISMISSED_KEY );
+
+        update_option( self::GLOBAL_CONSENT_VERSION_KEY, self::CONSENT_VERSION, false );
+    }
+
+    /**
      * Unschedule background reporting
      *
      * Removes the scheduled cron job for system info reporting.
@@ -752,57 +815,9 @@ class Client {
      * @return void
      */
     private function finalize_optin_setup(): void {
-        $this->maybe_mark_activation_pending_for_active_plugin();
-
         if ( ! get_option( self::GLOBAL_TABLE_CREATED_KEY ) ) {
             $this->create_queue_table();
             update_option( self::GLOBAL_TABLE_CREATED_KEY, 'yes' );
-        }
-
-        $activation_pending = 'yes' === get_option( $this->config['slug'] . '_telemetry_activation_pending' );
-        $activation_tracked = 'yes' === get_option( $this->config['slug'] . '_telemetry_activated_tracked' );
-
-        if ( $activation_pending && ! $activation_tracked ) {
-            $this->track_immediate(
-                'plugin_activated',
-                [
-                    'site_url'  => get_site_url(),
-                    'unique_id' => $this->config['unique_id'],
-                ],
-                true
-            );
-            update_option( $this->config['slug'] . '_telemetry_activated_tracked', 'yes' );
-            delete_option( $this->config['slug'] . '_telemetry_activation_pending' );
-        }
-    }
-
-    /**
-     * Mark activation as pending when plugin is already active but activation hook was missed.
-     *
-     * This covers flows where the telemetry client initializes after activation,
-     * such as setup wizard based bootstrapping.
-     *
-     * @return void
-     */
-    private function maybe_mark_activation_pending_for_active_plugin(): void {
-        $activation_pending = 'yes' === get_option( $this->config['slug'] . '_telemetry_activation_pending' );
-        $activation_tracked = 'yes' === get_option( $this->config['slug'] . '_telemetry_activated_tracked' );
-
-        if ( $activation_pending || $activation_tracked ) {
-            return;
-        }
-
-        $plugin_basename = plugin_basename( $this->config['pluginFile'] );
-        $active_plugins  = (array) get_option( 'active_plugins', [] );
-        $is_active       = in_array( $plugin_basename, $active_plugins, true );
-
-        if ( ! $is_active && is_multisite() ) {
-            $network_active_plugins = (array) get_site_option( 'active_sitewide_plugins', [] );
-            $is_active = isset( $network_active_plugins[ $plugin_basename ] );
-        }
-
-        if ( $is_active ) {
-            update_option( $this->config['slug'] . '_telemetry_activation_pending', 'yes', false );
         }
     }
 

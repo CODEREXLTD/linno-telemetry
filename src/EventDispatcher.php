@@ -102,6 +102,36 @@ class EventDispatcher {
 	}
 
 	/**
+	 * Dispatch a minimal event payload without automatic metadata enrichment.
+	 *
+	 * This is used for lifecycle events that must not include personal data
+	 * or consent-gated context.
+	 *
+	 * @param string $event Event name.
+	 * @param array  $properties Event properties.
+	 *
+	 * @return bool True on success, false on failure.
+	 * @since 1.0.0
+	 */
+	public function dispatch_minimal( string $event, array $properties = array() ): bool {
+		$sanitized_event      = Utils::sanitizeEventName( $event );
+		$sanitized_properties = Utils::sanitizeProperties( $properties );
+
+		if ( empty( $sanitized_event ) ) {
+			return false;
+		}
+
+		$result = $this->driver->send( $sanitized_event, $sanitized_properties );
+
+		if ( ! $result ) {
+			$error = $this->driver->getLastError();
+			return false;
+		}
+
+		return true;
+	}
+
+	/**
 	 * Normalize payload to create consistent event structure
 	 *
 	 * Creates a standardized structure with event and properties keys,

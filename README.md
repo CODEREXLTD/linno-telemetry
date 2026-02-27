@@ -250,11 +250,11 @@ $telemetry_client->triggers()
 The SDK automatically tracks these events **without requiring user consent**:
 
 -   **`plugin_activated`**: When the plugin is activated.
-    -   Includes: `site_url`, `activation_time`.
+    -   Includes: `site_url`, `unique_id`.
 -   **`plugin_deactivated`**: When the plugin is deactivated.
-    -   Includes: `site_url`, `deactivation_time`, `reason_id`, `reason_info`.
+    -   Includes: `site_url`, `unique_id`, `reason`.
 
-**Why no opt-in required?** These lifecycle events are essential for understanding plugin adoption and uninstallation reasons. They are designed to contain no personal data.
+**Why no opt-in required?** These lifecycle events are essential for understanding plugin adoption and uninstallation reasons. They are designed to contain no personal data (no email, name, avatar, or user profile fields).
 
 ## Data Collected (with User Consent)
 
