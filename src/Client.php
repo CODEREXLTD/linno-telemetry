@@ -638,7 +638,8 @@ class Client {
             return;
         }
 
-        sleep( 1 );
+        // Ensure first_strike appears at least 1 second after setup in telemetry timelines.
+        $properties['timestamp'] = gmdate( 'c', time() + 1 );
 
         $this->track( 'first_strike', $properties );
         $this->mark_event_sent( 'first_strike' );
