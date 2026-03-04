@@ -638,6 +638,8 @@ class Client {
             return;
         }
 
+        sleep( 1 );
+
         $this->track( 'first_strike', $properties );
         $this->mark_event_sent( 'first_strike' );
     }
