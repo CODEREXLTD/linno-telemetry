@@ -396,8 +396,11 @@ class Client {
      */
     public function track_lifecycle_event( string $event, array $properties = array() ): void {
         $minimal_properties = array(
-            'site_url'  => esc_url_raw( (string) ( $properties['site_url'] ?? get_site_url() ) ),
-            'unique_id' => sanitize_text_field( (string) ( $properties['unique_id'] ?? $this->config['unique_id'] ) ),
+            'site_url'   => esc_url_raw( (string) ( $properties['site_url'] ?? get_site_url() ) ),
+            'unique_id'  => sanitize_text_field( (string) ( $properties['unique_id'] ?? $this->config['unique_id'] ) ),
+            '__identify' => array(
+                'profileId' => Utils::getSiteProfileId(),
+            ),
         );
 
         if ( 'plugin_deactivated' === $event ) {
@@ -609,6 +612,10 @@ class Client {
             return;
         }
 
+        if ( ! $this->isOptInEnabled() ) {
+            return;
+        }
+
         $this->track( 'setup', $properties );
         $this->mark_event_sent( 'setup' );
     }
@@ -624,6 +631,10 @@ class Client {
      */
     public function track_first_strike( array $properties = [] ): void {
         if ( $this->has_sent_event( 'first_strike' ) ) {
+            return;
+        }
+
+        if ( ! $this->isOptInEnabled() ) {
             return;
         }
 
