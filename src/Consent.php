@@ -46,11 +46,27 @@ class Consent {
             return;
         }
 
-        if ( $_GET['plugin'] !== $this->client->get_slug() ) {
+        if ( sanitize_key( wp_unslash( $_GET['plugin'] ) ) !== $this->client->get_slug() ) {
             return;
         }
 
-        if ( $_GET['action'] === 'optin' ) {
+        $action = sanitize_key( wp_unslash( $_GET['action'] ) );
+        if ( ! in_array( $action, array( 'optin', 'optout' ), true ) ) {
+            return;
+        }
+
+        // admin_init also fires for unauthenticated admin-ajax.php / admin-post.php requests.
+        if ( wp_doing_ajax() || ( isset( $GLOBALS['pagenow'] ) && 'admin-post.php' === $GLOBALS['pagenow'] ) ) {
+            return;
+        }
+
+        if ( ! current_user_can( 'manage_options' ) ) {
+            return;
+        }
+
+        check_admin_referer( $this->get_nonce_action( $action ) );
+
+        if ( 'optin' === $action ) {
             $this->client->set_optin_state( 'yes' );
             $this->dismiss_notice();
 
@@ -59,12 +75,12 @@ class Consent {
             $this->client->activate();
         }
 
-        if ( $_GET['action'] === 'optout' ) {
+        if ( 'optout' === $action ) {
             $this->client->set_optin_state( 'no' );
             $this->dismiss_notice();
         }
 
-        wp_safe_redirect( remove_query_arg( array( 'action', 'plugin' ) ) );
+        wp_safe_redirect( remove_query_arg( array( 'action', 'plugin', '_wpnonce' ) ) );
         exit;
     }
 
@@ -85,15 +101,21 @@ class Consent {
         
         $plugin_name = $this->client->get_plugin_name();
 
-        $optin_url = add_query_arg( array(
-            'action' => 'optin',
-            'plugin' => $this->client->get_slug(),
-        ) );
+        $optin_url = wp_nonce_url(
+            add_query_arg( array(
+                'action' => 'optin',
+                'plugin' => $this->client->get_slug(),
+            ) ),
+            $this->get_nonce_action( 'optin' )
+        );
 
-        $optout_url = add_query_arg( array(
-            'action' => 'optout',
-            'plugin' => $this->client->get_slug(),
-        ) );
+        $optout_url = wp_nonce_url(
+            add_query_arg( array(
+                'action' => 'optout',
+                'plugin' => $this->client->get_slug(),
+            ) ),
+            $this->get_nonce_action( 'optout' )
+        );
 
         ?>
         <div class="notice notice-info">
@@ -125,6 +147,16 @@ class Consent {
             </p>
         </div>
         <?php
+    }
+
+    /**
+     * Get the nonce action for an opt-in/opt-out request.
+     *
+     * @param string $action Either 'optin' or 'optout'.
+     * @return string
+     */
+    private function get_nonce_action( string $action ): string {
+        return $this->client->get_slug() . '_telemetry_' . $action;
     }
 
     /**
